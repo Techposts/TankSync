@@ -23,9 +23,9 @@
  *   - GPIO3:  Battery ADC (via voltage divider)
  *   - GPIO2:  WS2812B Data
  * 
- * Author: Your Name
+ * Author: Ravi Singh (TechPosts Guides)
  * License: MIT
- * Repository: https://github.com/yourusername/LoRa-Water-Tank-Monitor
+ * Repository: https://github.com/techposts/LoRa-Water-Tank-Monitor
  */
 
 #include <WiFi.h>
