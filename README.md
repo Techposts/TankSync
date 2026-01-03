@@ -7,6 +7,15 @@ A wireless water tank level monitoring system using LoRa (Long Range) radio comm
 ![LoRa](https://img.shields.io/badge/LoRa-RYLR998-orange.svg)
 
 ---
+### Hardware Photos
+
+**Transmitter Unit** (Tank Side - Battery Powered):
+
+![Transmitter Hardware](docs/Transmitter.jpg)
+
+**Receiver Unit** (Indoor - USB Powered):
+
+![Receiver Hardware](docs/Receiver.JPG)
 
 ## 🚀 Quick Start - Pre-compiled Binaries Available!
 
@@ -117,16 +126,6 @@ esptool.py --chip esp32c3 --port COM3 --baud 921600 write_flash 0x0 firmware.bin
 │  Modules: WiFi Manager | MQTT Handler | Display | LoRa Comm | Tank Data     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
-
-### Hardware Photos
-
-**Transmitter Unit** (Tank Side - Battery Powered):
-
-![Transmitter Hardware](docs/Transmitter%20Image.jpg)
-
-**Receiver Unit** (Indoor - USB Powered):
-
-![Receiver Hardware](docs/Receiver%20image.JPG)
 
 ## 🛠 Hardware Requirements
 
