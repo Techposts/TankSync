@@ -32,6 +32,8 @@ Open this website in Chrome, Edge, or Opera:
 1. Connect your ESP32-C3 SuperMini to your computer via USB
 2. The device should be recognized automatically
 
+![mainpage](docs/BaudRate%20115200%20Select.jpg)
+
 #### Step 3: Select Device
 
 Click **"Connect"** button on the website
