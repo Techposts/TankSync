@@ -6,14 +6,37 @@ A wireless water tank level monitoring system using LoRa (Long Range) radio comm
 ![Platform](https://img.shields.io/badge/platform-ESP32--C3-green.svg)
 ![LoRa](https://img.shields.io/badge/LoRa-RYLR998-orange.svg)
 
+---
+
+## 🚀 Quick Start - Pre-compiled Binaries Available!
+
+**Don't want to compile?** Download ready-to-flash `.bin` files:
+
+| Component | Download | Size |
+|-----------|----------|------|
+| **Transmitter** | [📥 Download](firmware/v1.0/Transmitter_ESP32C3_v1.0.bin) | 4.0 MB |
+| **Receiver** | [📥 Download](firmware/v1.0/Receiver_ESP32C3_v1.0.bin) | 4.0 MB |
+
+**Flash with one command:**
+```bash
+esptool.py --chip esp32c3 --port COM3 --baud 921600 write_flash 0x0 firmware.bin
+```
+
+📖 **Complete flashing guide**: [FLASHING.md](FLASHING.md)
+📦 **All releases**: [firmware/](firmware/)
+
+---
+
 ## 📋 Table of Contents
 
+- [Quick Start - Pre-compiled Binaries](#-quick-start---pre-compiled-binaries-available)
 - [Features](#-features)
 - [System Overview](#-system-overview)
 - [Hardware Requirements](#-hardware-requirements)
 - [Pin Configuration](#-pin-configuration)
 - [Wiring Diagrams](#-wiring-diagrams)
 - [Software Setup](#-software-setup)
+- [Flashing Pre-compiled Firmware](FLASHING.md)
 - [Configuration](#-configuration)
 - [LED Status Reference](#-led-status-reference)
 - [Web Dashboard](#-web-dashboard)

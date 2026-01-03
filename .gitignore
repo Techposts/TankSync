@@ -4,6 +4,9 @@
 *.elf
 *.map
 
+# BUT keep firmware release binaries
+!firmware/**/*.bin
+
 # IDE files
 .vscode/
 .idea/
