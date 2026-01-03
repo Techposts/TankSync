@@ -41,6 +41,7 @@ Click **"Connect"** button on the website
 A popup will appear showing available serial ports:
 - Select your ESP32-C3 device (usually shows as "USB Serial" or "CH340")
 - Click **"Connect"**
+- Choose BaudRate **"115200"**
 
 #### Step 4: Program the Firmware
 
