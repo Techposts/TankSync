@@ -364,83 +364,7 @@ Example:
 
 ## 💻 Software Setup
 
-### Arduino IDE Configuration
-
-#### 1. Install Arduino IDE
-
-Download Arduino IDE 2.0+ from [arduino.cc](https://www.arduino.cc/en/software)
-
-#### 2. Add ESP32 Board Support
-
-1. Open Arduino IDE
-2. Go to `File` → `Preferences`
-3. Add to "Additional Board Manager URLs":
-   ```
-   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-   ```
-4. Go to `Tools` → `Board` → `Boards Manager`
-5. Search "esp32"
-6. Install "ESP32 by Espressif Systems" (version 2.0.0+)
-
-#### 3. Install Required Libraries
-
-Go to `Sketch` → `Include Library` → `Manage Libraries` and install:
-
-**For Transmitter**:
-- `Adafruit NeoPixel` by Adafruit
-
-**For Receiver**:
-- `Adafruit GFX Library` by Adafruit
-- `Adafruit SSD1306` by Adafruit
-- `Adafruit NeoPixel` by Adafruit
-- `PubSubClient` by Nick O'Leary
-- `Preferences` (built-in, no installation needed)
-
-#### 4. Board Settings
-
-Select the following in `Tools` menu:
-
-| Setting | Value |
-|---------|-------|
-| **Board** | ESP32C3 Dev Module |
-| **USB CDC On Boot** | Enabled |
-| **CPU Frequency** | 160MHz |
-| **Flash Size** | 4MB (32Mb) |
-| **Flash Mode** | QIO |
-| **Partition Scheme** | Default 4MB with spiffs |
-| **Upload Speed** | 921600 |
-| **Core Debug Level** | None (or Info for debugging) |
-
-## ⚙️ Configuration
-
-### Transmitter Configuration
-
-Edit in `Transmitter/Transmitter.ino`:
-
-```cpp
-// Sleep Configuration
-#define SLEEP_MINUTES       5                 // How often to wake and transmit
-
-// LoRa Configuration
-#define LORA_FREQUENCY      "865000000"       // India: 865 MHz
-                                              // EU: 868000000
-                                              // US/AU: 915000000
-#define LORA_NETWORK_ID     6                 // Must match receiver (3-15 or 18)
-#define LORA_TX_POWER       14                // TX power in dBm (0-22)
-#define MY_ADDRESS          1                 // This transmitter's address
-#define RECEIVER_ADDRESS    2                 // Receiver's address
-
-// Battery Configuration
-#define VOLTAGE_DIVIDER_RATIO   2.0           // (R1 + R2) / R2 = (10K + 10K) / 10K
-#define ADC_CALIBRATION_FACTOR  0.918         // Adjust if voltage reading is off
-#define BATTERY_FULL_VOLTAGE    4.2           // Li-ion fully charged
-#define BATTERY_EMPTY_VOLTAGE   3.0           // Safe discharge cutoff
-
-// Sensor Configuration
-#define SENSOR_NUM_READINGS     7             // Number of readings to average
-#define SENSOR_READING_INTERVAL 120           // ms between readings (min 100ms)
-#define DISTANCE_OFFSET_CM      0             // Calibration offset
-```
+Go to **[Flashing Pre-compiled Firmware](FLASHING.md)** page and follow the instructions
 
 ### Receiver Configuration
 
@@ -455,29 +379,6 @@ Edit in `Transmitter/Transmitter.ino`:
    - **Tank**: Min distance, max distance, capacity
    - **LoRa**: Frequency, network ID, address (must match transmitter)
 5. Click Save - device will restart
-
-**Method 2: Edit config.h** (Advanced)
-
-Edit `ReceiverModular/config.h`:
-
-```cpp
-// MQTT Configuration
-#define DEFAULT_MQTT_SERVER     "192.168.0.163"  // Your MQTT broker IP
-#define DEFAULT_MQTT_PORT       1885
-#define DEFAULT_MQTT_USER       "mqtt-user"
-#define DEFAULT_MQTT_PASSWORD   "your-password"
-#define DEFAULT_MQTT_ENABLED    true
-
-// Tank Configuration
-#define DEFAULT_MIN_DISTANCE    30      // cm - sensor reading when FULL
-#define DEFAULT_MAX_DISTANCE    120     // cm - sensor reading when EMPTY
-#define DEFAULT_TANK_CAPACITY   942.5   // Liters
-
-// LoRa Configuration
-#define DEFAULT_LORA_FREQUENCY      "865000000"  // Must match transmitter
-#define DEFAULT_LORA_NETWORK_ID     6            // Must match transmitter
-#define DEFAULT_MY_ADDRESS          2            // Receiver address
-```
 
 ## 💡 LED Status Reference
 
