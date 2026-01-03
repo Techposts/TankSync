@@ -2,7 +2,7 @@
 
 Battery-powered transmitter unit that measures water level using ultrasonic sensor and transmits data via LoRa. Optimized for ultra-low power consumption with deep sleep mode.
 
-![Transmitter Hardware](../docs/Transmitter%20image.JPG)
+![Transmitter Hardware](../docs/Receiver%20Image.jpg)
 
 ## Hardware
 
