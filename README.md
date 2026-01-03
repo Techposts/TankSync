@@ -54,7 +54,6 @@ esptool.py --chip esp32c3 --port COM3 --baud 921600 write_flash 0x0 firmware.bin
 - [Battery Life](#-battery-life)
 - [Troubleshooting](#-troubleshooting)
 - [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
 - [License](#-license)
 
 ## ✨ Features
@@ -933,26 +932,6 @@ LoRa-Water-Tank-Monitor/
     └── pcb/                          # Optional PCB designs
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Report Bugs**: Open an issue with detailed description
-2. **Suggest Features**: Describe your idea in an issue
-3. **Submit Pull Requests**:
-   - Fork the repository
-   - Create feature branch (`git checkout -b feature/AmazingFeature`)
-   - Commit changes (`git commit -m 'Add AmazingFeature'`)
-   - Push to branch (`git push origin feature/AmazingFeature`)
-   - Open Pull Request
-
-### Development Guidelines
-
-- Follow existing code style
-- Comment complex logic
-- Test on actual hardware before PR
-- Update documentation for new features
-- Keep commits atomic and descriptive
 
 ## 📄 License
 
