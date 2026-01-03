@@ -19,14 +19,25 @@ See [v1.0/RELEASE_NOTES.md](v1.0/RELEASE_NOTES.md) for full details.
 
 ## 🚀 Quick Flash
 
-### Prerequisites
+### Web Flasher (Easiest - Recommended)
+
+**No software installation required!**
+
+1. Open in Chrome/Edge/Opera: **https://espressif.github.io/esptool-js/**
+2. Connect ESP32-C3 via USB
+3. Click "Connect" and select your device
+4. Choose the `.bin` file
+5. Set address to `0x0`
+6. Click "Program"
+
+**Detailed instructions**: See [FLASHING.md](../FLASHING.md) with screenshots
+
+### Command Line (Alternative)
 
 Install [esptool](https://github.com/espressif/esptool):
 ```bash
 pip install esptool
 ```
-
-### Flash Commands
 
 **Transmitter**:
 ```bash

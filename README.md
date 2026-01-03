@@ -634,6 +634,10 @@ mqtt:
       icon: mdi:counter
 ```
 
+**Screenshot - MQTT Configuration:**
+
+![Home Assistant MQTT Configuration](docs/Home%20Assistant%20MQTT.yaml.jpg)
+
 ### Lovelace Dashboard Card
 
 ```yaml
@@ -676,6 +680,10 @@ cards:
       yellow: 20
       red: 0
 ```
+
+**Screenshot - Home Assistant Dashboard:**
+
+![Home Assistant Dashboard Card](docs/Home%20Assistant%20Card%20Dashbaord.jpg)
 
 ### Automation Examples
 
