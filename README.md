@@ -125,6 +125,7 @@ esptool.py --chip esp32c3 --port COM3 --baud 921600 write_flash 0x0 firmware.bin
 │  Modules: WiFi Manager | MQTT Handler | Display | LoRa Comm | Tank Data     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+![Demo GIF](docs/Receiver%20Module.gif)
 
 ## 🛠 Hardware Requirements
 
