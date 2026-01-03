@@ -870,13 +870,22 @@ Need help? Here's how to get support:
    - Photos of connections
 4. **Discussions**: Join [Discussions](../../discussions) for questions
 
-## 🌟 Show Your Support
+## 🔧 Enclosure Design & STL Files
 
-If this project helped you, please:
+The enclosures shown in this project were **designed completely from scratch** and went through **multiple iterations, failed prints, and real-world testing** before reaching this final version.
+
+To keep this project sustainable and continue improving it, the **STL files for 3D printing the enclosures are available to YouTube channel members**. [YouTube Channel Membership](https://www.youtube.com/@ravis1ngh/join)
+
+If you find this project useful and would like to support the time and effort behind it:
+- 🎁 Get access to STL files
 - ⭐ Star this repository
 - 📢 Share with others
 - 📝 Write a blog post about your build
 - 📷 Share photos of your installation
+- 🔄 Help fund future improvements
+- ❤️ Support open DIY development
+
+👉 Visit the YouTube channel and become a member to access the enclosure files.
 
 ---
 
