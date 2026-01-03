@@ -118,6 +118,16 @@ esptool.py --chip esp32c3 --port COM3 --baud 921600 write_flash 0x0 firmware.bin
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Hardware Photos
+
+**Transmitter Unit** (Tank Side - Battery Powered):
+
+![Transmitter Hardware](docs/Transmitter%20image.JPG)
+
+**Receiver Unit** (Indoor - USB Powered):
+
+![Receiver Hardware](docs/Receiver%20Image.jpg)
+
 ## 🛠 Hardware Requirements
 
 ### Transmitter (Tank Side)

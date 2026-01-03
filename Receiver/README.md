@@ -23,6 +23,8 @@ Receiver.ino         - Main program loop
 - Better for team collaboration
 - Clearer code organization
 
+![Receiver Hardware](../docs/Receiver%20Image.jpg)
+
 ## Hardware
 
 - **MCU**: ESP32-C3 SuperMini
