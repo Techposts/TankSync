@@ -1,0 +1,16 @@
+Component,Quantity (TX),Quantity (RX),Description,Approx Price (USD),Notes
+ESP32-C3 SuperMini,1,1,Main microcontroller with WiFi/BLE,$3.00,AliExpress/Amazon
+RYLR998,1,1,LoRa module 868/915MHz,$10.00,Reyax official or AliExpress
+JSN-SR04T,1,0,Waterproof ultrasonic sensor,$5.00,20cm-450cm range
+WS2812B LED Strip,2 LEDs,3 LEDs,Addressable RGB LEDs,$1.00,Cut from strip
+100K Resistor,2,0,1/4W for voltage divider,$0.10,Any standard resistor
+3.7V Li-ion Battery,1,0,18650 or similar 1000mAh+,$5.00,Protected cell recommended
+TP4056 Module,1,0,Battery charging module,$0.50,Optional for charging
+USB Cable,0,1,Micro USB or USB-C for power,$2.00,Depends on ESP32 variant
+Waterproof Enclosure,1,0,IP65 or better,$5.00,For outdoor installation
+Jumper Wires,As needed,As needed,For connections,$2.00,22-26 AWG
+Pin Headers,As needed,As needed,2.54mm pitch,$1.00,Optional for modularity
+,,,,,"
+TOTAL TRANSMITTER,,,,$27.00 - $35.00,
+TOTAL RECEIVER,,,,$15.00 - $20.00,
+COMPLETE SYSTEM,,,,$42.00 - $55.00,
