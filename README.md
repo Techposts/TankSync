@@ -1003,4 +1003,4 @@ If this project helped you, please:
 
 Made with ❤️ for the Home Automation Community
 
-Last Updated: January 2025
+Last Updated: January 2026
