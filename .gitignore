@@ -1,0 +1,22 @@
+# Build files
+**/build/
+*.bin
+*.elf
+*.map
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude settings
+.claude/
+
+# Temporary files
+*.tmp
+*.bak
+*~
