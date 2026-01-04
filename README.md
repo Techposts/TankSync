@@ -872,8 +872,7 @@ Need help? Here's how to get support:
    - Photos of connections
 4. **Discussions**: Join [Discussions](../../discussions) for questions
 
-[Watch the demo video on YouTube](https://www.youtube.com/watch?v=y9uNviszcvY)
-
+[![Watch the video](https://img.youtube.com/vi/y9uNviszcvY/0.jpg)](https://www.youtube.com/watch?v=y9uNviszcvY)
 
 ## 🔧 Enclosure Design & STL Files
 
