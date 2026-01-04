@@ -362,7 +362,7 @@ Example:
   Sensor at 75cm: Water = 50%
   Sensor at 120cm (empty): Water = 0%
 ```
-![Circuit Diagram](docs/circuit.png)
+![Circuit Diagram](docs/circuitDiagram.png)
 
 ## 💻 Software Setup
 
