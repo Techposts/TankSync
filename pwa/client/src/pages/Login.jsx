@@ -114,7 +114,7 @@ export default function Login() {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center px-6 bg-slate-950 overflow-auto">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 bg-slate-950">
       {/* Logo */}
       <div className="mb-10 text-center">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-water/10 mb-4">
