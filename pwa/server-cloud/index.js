@@ -400,7 +400,7 @@ app.post('/api/push/subscribe', { preHandler: [app.authenticate] }, async (req) 
   return { success: true };
 });
 
-app.delete('/api/push/unsubscribe', { preHandler: [app.authenticate] }, async (req) => {
+app.post('/api/push/unsubscribe', { preHandler: [app.authenticate] }, async (req) => {
   const { endpoint } = req.body || {};
   await db.run('DELETE FROM push_subs WHERE user_id = $1 AND endpoint = $2', req.user.id, endpoint);
   return { success: true };

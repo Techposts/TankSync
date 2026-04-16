@@ -77,6 +77,24 @@ export default function Settings() {
     }
   };
 
+  const disablePush = async () => {
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      const sub = await reg?.pushManager?.getSubscription();
+      if (sub) {
+        const { endpoint } = sub.toJSON();
+        await api.post('/api/push/unsubscribe', { endpoint });
+        await sub.unsubscribe();
+      }
+      setPushEnabled(false);
+    } catch (err) {
+      setPushError(`Failed to disable: ${err.message}`);
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
   const handleSiteSave = async () => {
     if (editingSite) {
       await updateSite(editingSite.id, siteForm);
@@ -132,12 +150,9 @@ export default function Settings() {
           </div>
           {typeof Notification === 'undefined' ? (
             <span className="text-xs text-slate-500">N/A</span>
-          ) : pushEnabled ? (
-            <ToggleSwitch on={true} />
           ) : (
-            <button onClick={enablePush} disabled={pushLoading}
-              className="text-xs text-water bg-water/10 px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
-              {pushLoading ? 'Setting up...' : 'Enable'}
+            <button onClick={pushEnabled ? disablePush : enablePush} disabled={pushLoading}>
+              <ToggleSwitch on={pushEnabled} />
             </button>
           )}
         </div>
