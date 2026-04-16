@@ -180,6 +180,6 @@ Contributions are welcome! Please open an issue or pull request.
 
 ## Author
 
-**Ravi Singh** - [Techposts](https://youtube.com/@techposts)
+**Ravi Singh** - [YouTube](https://www.youtube.com/@ravis1ngh)
 
 Built with ESP-IDF, React, Fastify, and a lot of late nights.
