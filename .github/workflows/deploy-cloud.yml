@@ -1,0 +1,75 @@
+name: Deploy TankSync Cloud
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pwa/**'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DROPLET_IP: "168.144.32.179"
+      APP_DIR: "/home/tanksync/tanksync-pwa"
+      VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pwa/package-cloud.json
+
+      - name: Install dependencies
+        working-directory: pwa
+        run: |
+          cp package-cloud.json package.json
+          npm install
+
+      - name: Build frontend
+        working-directory: pwa
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to droplet
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key root@${{ env.DROPLET_IP }}"
+          RSYNC="rsync -avz --delete -e 'ssh -i ~/.ssh/deploy_key'"
+
+          # Sync frontend build
+          eval $RSYNC pwa/dist/ root@${{ env.DROPLET_IP }}:${{ env.APP_DIR }}/dist/
+
+          # Sync cloud server code
+          eval $RSYNC --exclude node_modules \
+            pwa/server-cloud/ root@${{ env.DROPLET_IP }}:${{ env.APP_DIR }}/server/
+
+          # Sync package files
+          eval rsync -avz -e "'ssh -i ~/.ssh/deploy_key'" \
+            pwa/package-cloud.json root@${{ env.DROPLET_IP }}:${{ env.APP_DIR }}/package.json
+
+          # Sync client source (for future builds on server if needed)
+          eval $RSYNC --exclude node_modules \
+            pwa/client/ root@${{ env.DROPLET_IP }}:${{ env.APP_DIR }}/client/
+
+          # Install deps and restart
+          $SSH << 'ENDSSH'
+            cd /home/tanksync/tanksync-pwa
+            chown -R tanksync:tanksync .
+            sudo -u tanksync npm ci --omit=dev 2>&1 | tail -3
+            systemctl restart tanksync
+            sleep 2
+            systemctl is-active tanksync && echo "Deploy successful" || echo "DEPLOY FAILED"
+          ENDSSH
