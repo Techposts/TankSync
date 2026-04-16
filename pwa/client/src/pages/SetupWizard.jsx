@@ -67,10 +67,8 @@ export default function SetupWizard() {
 
               if (id && token && ip) {
                 stopScan();
-                // Claim directly via API
-                api.post('/api/link/claim', { device_id: id, token, receiver_ip: ip })
-                  .then(() => setStep(STEPS.length - 1))
-                  .catch(err => { setError(err.message); });
+                // Redirect to LinkDevice page which handles the full claim flow
+                window.location.href = `/link?id=${id}&token=${token}&ip=${ip}`;
               }
             } catch {} // Not a valid URL — keep scanning
           }
