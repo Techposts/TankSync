@@ -15,7 +15,6 @@ import Alerts from './pages/Alerts.jsx';
 import Settings from './pages/Settings.jsx';
 import OTA from './pages/OTA.jsx';
 import LinkDevice from './pages/LinkDevice.jsx';
-import Landing from './pages/Landing.jsx';
 
 export default function App() {
   return (
@@ -43,7 +42,7 @@ function AppRoutes() {
   if (!user || needsVerification) {
     return (
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/link" element={<LinkDevice />} />
         <Route path="*" element={<Navigate to="/" replace />} />
