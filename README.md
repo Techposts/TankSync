@@ -31,8 +31,8 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
                                               |              192.168.x.x
                                     +---------+---------+
                                     |                   |
-                              Home Assistant      TankSync PWA
-                              (auto-discovery)    (cloud dashboard)
+                              Home Assistant      TankSync Cloud
+                              (auto-discovery)    (web dashboard)
 ```
 
 ## Features
@@ -43,7 +43,7 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 - **Local Display**: SH1106 1.3" OLED on receiver shows tank levels, battery, signal
 - **Web UI**: Built-in configuration interface on the receiver (WiFi, MQTT, LoRa, OTA)
 - **Home Assistant**: Native MQTT auto-discovery integration
-- **TankSync PWA**: Optional cloud dashboard with push notifications, multi-site, QR linking
+- **TankSync Cloud**: Web dashboard with push notifications, multi-site monitoring, QR device linking
 - **OTA Updates**: WiFi OTA for receiver, LoRa OTA relay for transmitter
 - **Captive Portal**: Auto-redirect WiFi setup on iOS, Android, and Windows
 - **Remote Config**: Push sleep interval and sample count to transmitters over LoRa
@@ -110,10 +110,13 @@ idf.py -p /dev/ttyACM0 flash
 3. Configure your home WiFi credentials, MQTT broker, and LoRa settings
 4. **Transmitter** auto-pairs on first boot -- press the "Start Pairing" button in the receiver web UI
 
-## TankSync PWA (Optional Cloud Dashboard)
+## TankSync Cloud
 
-A Progressive Web App for monitoring tanks from anywhere.
+A web dashboard for monitoring your tanks from anywhere. Use the hosted version or self-host your own.
 
+**Hosted:** [tanksync.smartghar.org](https://tanksync.smartghar.org) -- scan the QR code from your receiver's web UI to link your device.
+
+**Self-host:**
 ```bash
 cd pwa
 npm install
@@ -141,9 +144,9 @@ firmware/
   receiver/          ESP32 DevKit receiver (MIT)
   receiver-c3/       ESP32-C3 receiver variant (MIT)
   transmitter/       ESP32-C3 transmitter (MIT)
-pwa/                 TankSync cloud dashboard (AGPL-3.0)
+pwa/                 TankSync Cloud dashboard (AGPL-3.0)
   server/            Fastify + SQLite + MQTT bridge
-  client/            React + Tailwind PWA frontend
+  client/            React + Tailwind frontend
 hardware/            BOM and hardware designs (CC BY-SA 4.0)
 docs/                Documentation and images
 ```
