@@ -526,6 +526,62 @@ static void ensure_link_token(void) {
     snprintf(s_link_token, sizeof(s_link_token), "%08" PRIx32, r1);
 }
 
+// Claim page — served by receiver (HTTP, same-origin). Collects tank data
+// locally, then redirects to the cloud with everything URL-encoded.
+// This avoids the HTTPS→HTTP mixed content browser restriction.
+static esp_err_t handle_claim_page(httpd_req_t *req) {
+    ensure_link_token();
+    const char *dev_id = mqtt_manager_device_id();
+    const char *ip = wifi_manager_ip();
+
+    // Build tank data JSON inline
+    char tanks_json[512] = "[]";
+    {
+        cJSON *arr = cJSON_CreateArray();
+        for (int i = 0; i < registry_count(); i++) {
+            tx_info_t info; tx_data_t data;
+            if (!registry_get_info(i, &info) || !info.enabled) continue;
+            registry_get_data(i, &data);
+            cJSON *t = cJSON_CreateObject();
+            cJSON_AddNumberToObject(t, "address", info.address);
+            cJSON_AddStringToObject(t, "name", info.name);
+            cJSON_AddNumberToObject(t, "min_dist", info.min_dist_cm);
+            cJSON_AddNumberToObject(t, "max_dist", info.max_dist_cm);
+            cJSON_AddNumberToObject(t, "capacity", info.capacity_liters);
+            cJSON_AddItemToArray(arr, t);
+        }
+        char *s = cJSON_PrintUnformatted(arr);
+        if (s) { strncpy(tanks_json, s, sizeof(tanks_json)-1); free(s); }
+        cJSON_Delete(arr);
+    }
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    char *page = malloc(2048);
+    if (!page) return ESP_FAIL;
+    int len = snprintf(page, 2048,
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>TankSync — Linking</title>"
+        "<style>body{background:#0F172A;color:#fff;font-family:sans-serif;"
+        "display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center}"
+        ".spinner{width:48px;height:48px;border:4px solid rgba(14,165,233,0.3);"
+        "border-top-color:#0EA5E9;border-radius:50%%;animation:spin 1s linear infinite;margin:0 auto 16px}"
+        "@keyframes spin{to{transform:rotate(360deg)}}</style></head>"
+        "<body><div><div class='spinner'></div>"
+        "<h2>Linking to TankSync Cloud</h2>"
+        "<p style='opacity:0.6'>Redirecting...</p>"
+        "<script>"
+        "var tanks=encodeURIComponent(JSON.stringify(%s));"
+        "var url='%s/link?id=%s&token=%s&ip=%s&tanks='+tanks;"
+        "window.location.href=url;"
+        "</script></div></body></html>",
+        tanks_json, TANKSYNC_CLOUD_URL, dev_id, s_link_token, ip);
+
+    httpd_resp_send(req, page, len);
+    free(page);
+    return ESP_OK;
+}
+
 static esp_err_t handle_api_link(httpd_req_t *req) {
     ensure_link_token();
     const char *dev_id = mqtt_manager_device_id();
@@ -539,7 +595,8 @@ static esp_err_t handle_api_link(httpd_req_t *req) {
 
     // Build the claim URL
     char url[256];
-    snprintf(url, sizeof(url), TANKSYNC_CLOUD_URL "/link?id=%s&token=%s&ip=%s", dev_id, s_link_token, ip);
+    // QR URL points to receiver's /claim page (HTTP, avoids mixed content)
+    snprintf(url, sizeof(url), "http://%s/claim", ip);
     cJSON_AddStringToObject(root, "url", url);
 
     char *json = cJSON_PrintUnformatted(root); cJSON_Delete(root); send_json(req, json); free(json);
@@ -860,6 +917,7 @@ static const httpd_uri_t s_routes[] = {
     URI(HTTP_POST, "/api/ota/upload", handle_ota_upload), URI(HTTP_POST, "/api/ota/upload_tx", handle_ota_upload_tx),
     URI(HTTP_GET, "/api/display", handle_get_display), URI(HTTP_POST, "/api/display", handle_post_display),
     URI(HTTP_GET, "/api/link", handle_api_link),
+    URI(HTTP_GET, "/claim", handle_claim_page),
     // Captive portal detection endpoints
     URI(HTTP_GET, "/hotspot-detect.html", handle_captive_redirect),  // iOS
     URI(HTTP_GET, "/library/test/success.html", handle_captive_redirect), // iOS alternate
@@ -873,7 +931,7 @@ static const httpd_uri_t s_routes[] = {
 esp_err_t web_server_start(void) {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port        = WEB_PORT;
-    cfg.max_uri_handlers   = 38;
+    cfg.max_uri_handlers   = 40;
     cfg.uri_match_fn       = httpd_uri_match_wildcard;
     cfg.max_open_sockets   = 6;          // leave 4+ lwIP sockets for MQTT/DNS/NTP
     cfg.recv_wait_timeout  = 15;         // balance: short enough to free sockets, long enough for TX firmware upload

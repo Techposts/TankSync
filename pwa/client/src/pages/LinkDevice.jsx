@@ -21,10 +21,13 @@ export default function LinkDevice() {
   const deviceId = searchParams.get('id');
   const token = searchParams.get('token');
   const receiverIp = searchParams.get('ip');
+  const tanksParam = searchParams.get('tanks');
 
   const [status, setStatus] = useState('linking');
   const [message, setMessage] = useState('');
   const [step, setStep] = useState('');
+  const [mqttCreds, setMqttCreds] = useState(null);
+  const [mqttAutoConfigured, setMqttAutoConfigured] = useState(false);
 
   useEffect(() => {
     if (!deviceId || !token || !receiverIp) setStatus('missing_params');
@@ -43,26 +46,13 @@ export default function LinkDevice() {
 
   const claimDevice = async () => {
     try {
-      // Step 1: Try to verify and discover from receiver (only works if on same LAN + HTTP allowed)
-      setStep('Discovering tanks...');
-      let tanks = [];
-      let transmitters = [];
-      try {
-        const resp = await fetch(`http://${receiverIp}/api/data`, { signal: AbortSignal.timeout(3000) });
-        const data = await resp.json();
-        tanks = data.tanks || [];
-      } catch {
-        // Mixed content or not on LAN — proceed anyway, server will create empty site
-      }
-
-      try {
-        const txResp = await fetch(`http://${receiverIp}/api/transmitters`, { signal: AbortSignal.timeout(3000) });
-        const txData = await txResp.json();
-        transmitters = txData.transmitters || [];
-      } catch {}
-
-      // Step 2: Send to cloud server — token in URL is proof of physical access
+      // Tanks come from the receiver's /claim redirect (embedded in URL)
       setStep('Setting up cloud connection...');
+      let tanks = [];
+      if (tanksParam) {
+        try { tanks = JSON.parse(tanksParam); } catch {}
+      }
+      const transmitters = tanks; // same data, has min_dist/max_dist/capacity
       const result = await api.post('/api/link/claim', {
         device_id: deviceId,
         receiver_ip: receiverIp,
@@ -93,12 +83,34 @@ export default function LinkDevice() {
         }
       }
 
+      // Step 3: Try to push MQTT config to receiver directly
+      let mqttPushed = false;
+      if (result.mqtt && receiverIp) {
+        setStep('Configuring receiver...');
+        try {
+          const pushResp = await fetch(`http://${receiverIp}/api/mqtt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              host: result.mqtt.mqtt_host,
+              port: result.mqtt.mqtt_port,
+              user: result.mqtt.mqtt_username,
+              pass: result.mqtt.mqtt_password,
+              enabled: true, ha_discovery: false, use_tls: true,
+            }),
+            signal: AbortSignal.timeout(5000),
+          });
+          mqttPushed = pushResp.ok;
+        } catch {} // May fail due to mixed content — handled below
+      }
+
       setStatus('success');
-      const mqttMsg = result.mqtt ? ' MQTT auto-configured.' : '';
+      setMqttCreds(result.mqtt);
+      setMqttAutoConfigured(mqttPushed);
       if (result.already_linked) {
-        setMessage('This device is already linked to your account.' + mqttMsg);
+        setMessage('This device is already linked to your account.');
       } else {
-        setMessage(`Linked successfully! ${result.device_count || 0} tank${result.device_count !== 1 ? 's' : ''} discovered.${mqttMsg}`);
+        setMessage(`Linked successfully! ${result.device_count || 0} tank${result.device_count !== 1 ? 's' : ''} discovered.`);
       }
     } catch (err) {
       setStatus('error');
@@ -140,7 +152,25 @@ export default function LinkDevice() {
           </svg>
         </div>
         <h2 className="text-2xl font-bold text-white mb-2">Device Linked!</h2>
-        <p className="text-slate-400 text-sm mb-8">{message}</p>
+        <p className="text-slate-400 text-sm mb-4">{message}</p>
+
+        {mqttAutoConfigured ? (
+          <div className="bg-success/10 border border-success/30 rounded-xl px-4 py-3 mb-6 text-sm text-success">
+            MQTT auto-configured. Your receiver will connect to the cloud automatically.
+          </div>
+        ) : mqttCreds ? (
+          <div className="bg-warning/10 border border-warning/30 rounded-xl px-4 py-3 mb-4 text-sm text-left">
+            <p className="text-warning font-medium mb-2">Configure MQTT on your receiver:</p>
+            <p className="text-slate-300 text-xs font-mono mb-1">Host: {mqttCreds.mqtt_host}</p>
+            <p className="text-slate-300 text-xs font-mono mb-1">Port: {mqttCreds.mqtt_port}</p>
+            <p className="text-slate-300 text-xs font-mono mb-1">User: {mqttCreds.mqtt_username}</p>
+            <p className="text-slate-300 text-xs font-mono mb-1">Pass: {mqttCreds.mqtt_password}</p>
+            <p className="text-slate-300 text-xs font-mono mb-2">TLS: Enabled</p>
+            <a href={`http://${receiverIp}`} target="_blank" rel="noopener"
+              className="inline-block text-water text-xs underline">Open Receiver Web UI</a>
+          </div>
+        ) : null}
+
         <button onClick={() => window.location.href = '/'}
           className="w-full max-w-xs py-3.5 rounded-xl bg-water text-white font-semibold
             hover:bg-water-dark active:scale-[0.98] transition-all">
