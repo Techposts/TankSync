@@ -426,7 +426,7 @@ static const char DASHBOARD_HTML[] =
 /* Fallback: just show the URL text for manual entry */
 "const c=document.getElementById('qr-container');"
 "try{"
-  "const size=200;"
+  "const size=280;"
   "c.innerHTML=`<img src='https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(d.url)}&bgcolor=FFFFFF&color=000000' "
   "width='${size}' height='${size}' alt='QR Code' style='image-rendering:pixelated' "
   "onerror=\"this.parentNode.innerHTML='<div style=color:#000;padding:2rem;font-size:.8rem>QR GENERATION FAILED<br>USE THE LINK BELOW</div>'\">`;"

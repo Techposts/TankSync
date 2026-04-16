@@ -59,12 +59,14 @@ export default function SetupWizard() {
           });
 
           if (code && code.data) {
+            const scanned = code.data.trim();
             try {
-              const parsed = new URL(code.data);
-              // New format: http://<ip>/claim — open directly (receiver handles redirect)
+              const parsed = new URL(scanned);
+              // New format: http://<ip>/claim
               if (parsed.pathname === '/claim') {
                 stopScan();
-                window.location.href = code.data;
+                window.location.href = scanned;
+                return;
               }
               // Old format: https://cloud/link?id=...&token=...&ip=...
               const id = parsed.searchParams.get('id');
@@ -73,6 +75,7 @@ export default function SetupWizard() {
               if (id && token && ip) {
                 stopScan();
                 window.location.href = `/link?id=${id}&token=${token}&ip=${ip}`;
+                return;
               }
             } catch {} // Not a valid URL — keep scanning
           }
