@@ -22,7 +22,7 @@ import webpush from 'web-push';
 
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = 'mailto:ravi.singh543@gmail.com';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:your-email@example.com';
 
 let vapidConfigured = false;
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
