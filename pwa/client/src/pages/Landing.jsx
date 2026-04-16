@@ -7,18 +7,168 @@ import { useNavigate } from 'react-router-dom';
 export default function Landing() {
   const navigate = useNavigate();
 
+  // Landing page is always dark — temporarily disable light theme if active
+  useEffect(() => {
+    const html = document.documentElement;
+    const wasLight = html.classList.contains('light');
+    if (wasLight) html.classList.remove('light');
+    return () => { if (wasLight) html.classList.add('light'); };
+  }, []);
+
   return (
     <div className="bg-slate-950 text-white overflow-x-hidden">
       <Nav onLogin={() => navigate('/login')} />
       <Hero onGetStarted={() => navigate('/login')} />
+      <WaveDivider flip />
       <Problem />
+      <WaveDivider />
       <Solution />
+      <WaveDivider flip />
       <HowItWorks />
+      <WaveDivider />
       <Features />
+      <WaveDivider flip />
       <TechSpecs />
+      <WaveDivider />
       <Pricing onGetStarted={() => navigate('/login')} />
+      <WaveDivider flip />
       <Hardware />
       <Footer />
+    </div>
+  );
+}
+
+// ─── SVG ICONS ─────────────────────────────────────────────────────────────
+const icons = {
+  droplet: (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+    </svg>
+  ),
+  zap: (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  ),
+  home: (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  ),
+  radio: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 17.94" />
+      <path d="M7.28 11.06A10.94 10.94 0 0 0 5 17.94" />
+      <path d="M14.34 13.5A6.97 6.97 0 0 1 16 17.94" />
+      <path d="M9.66 13.5A6.97 6.97 0 0 0 8 17.94" />
+      <circle cx="12" cy="18" r="1" />
+      <path d="M12 2v10" />
+    </svg>
+  ),
+  battery: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+      <line x1="23" y1="10" x2="23" y2="14" />
+      <rect x="4" y="9" width="6" height="6" rx="1" fill="#38BDF8" opacity="0.3" />
+    </svg>
+  ),
+  phone: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+      <line x1="12" y1="18" x2="12.01" y2="18" />
+    </svg>
+  ),
+  bell: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+  chart: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  homeAssistant: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <circle cx="12" cy="14" r="3" />
+      <path d="M12 11v-1" />
+      <path d="M14.6 12.5l.8-.5" />
+      <path d="M14.6 15.5l.8.5" />
+      <path d="M12 17v1" />
+      <path d="M9.4 15.5l-.8.5" />
+      <path d="M9.4 12.5l-.8-.5" />
+    </svg>
+  ),
+  shield: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  ),
+  layers: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  ),
+  refresh: (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 2v6h-6" />
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M3 22v-6h6" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  ),
+};
+
+// ─── WAVE DIVIDER ──────────────────────────────────────────────────────────
+function WaveDivider({ flip = false }) {
+  return (
+    <div className={`relative w-full h-16 sm:h-24 overflow-hidden ${flip ? 'rotate-180' : ''}`}>
+      <svg className="absolute bottom-0 w-full h-full" viewBox="0 0 1440 100" preserveAspectRatio="none" fill="none">
+        <path d="M0,40 C360,100 1080,0 1440,60 L1440,100 L0,100Z" fill="#0EA5E9" opacity="0.05" />
+        <path d="M0,60 C480,10 960,90 1440,40 L1440,100 L0,100Z" fill="#0EA5E9" opacity="0.03" />
+      </svg>
+    </div>
+  );
+}
+
+// ─── FLOATING BUBBLES ──────────────────────────────────────────────────────
+function Bubbles() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      {[...Array(12)].map((_, i) => (
+        <div
+          key={i}
+          className="landing-bubble absolute rounded-full"
+          style={{
+            width: `${6 + (i % 5) * 4}px`,
+            height: `${6 + (i % 5) * 4}px`,
+            left: `${5 + (i * 8) % 90}%`,
+            bottom: `-${10 + (i * 7) % 20}%`,
+            animationDelay: `${i * 1.2}s`,
+            animationDuration: `${8 + (i % 4) * 3}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── WATER SURFACE ─────────────────────────────────────────────────────────
+function WaterSurface({ className = '' }) {
+  return (
+    <div className={`absolute left-0 right-0 overflow-hidden pointer-events-none ${className}`} aria-hidden="true">
+      <svg className="w-full landing-water-surface" viewBox="0 0 1440 60" preserveAspectRatio="none">
+        <path className="landing-wave-1" d="M0,30 C240,10 480,50 720,30 C960,10 1200,50 1440,30 L1440,60 L0,60Z" fill="#0EA5E9" opacity="0.06" />
+        <path className="landing-wave-2" d="M0,35 C300,55 600,15 900,35 C1200,55 1350,20 1440,35 L1440,60 L0,60Z" fill="#38BDF8" opacity="0.04" />
+      </svg>
     </div>
   );
 }
@@ -80,6 +230,12 @@ function Hero({ onGetStarted }) {
       <div className="absolute inset-0 bg-gradient-to-b from-sky-500/10 via-transparent to-transparent" />
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-3xl" />
 
+      {/* Floating bubbles */}
+      <Bubbles />
+
+      {/* Water surface at bottom */}
+      <WaterSurface className="bottom-0 h-20" />
+
       <FadeIn>
         <div className="inline-flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-full px-4 py-1.5 mb-8">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -116,7 +272,6 @@ function Hero({ onGetStarted }) {
       </FadeIn>
 
       <FadeIn delay={500} className="mt-16 w-full max-w-4xl">
-        {/* PLACEHOLDER: Dashboard screenshot mockup on phone/laptop */}
         <div className="relative mx-auto">
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-2xl shadow-sky-500/10">
             <div className="bg-slate-800 rounded-xl aspect-[16/9] flex items-center justify-center">
@@ -138,13 +293,25 @@ function Hero({ onGetStarted }) {
 // ─── PROBLEM ────────────────────────────────────────────────────────────────
 function Problem() {
   const stats = [
-    { value: '135L', label: 'water wasted daily per household due to overflow', icon: '💧' },
-    { value: '23%', label: 'of water pumps fail from running dry', icon: '⚡' },
-    { value: '2x', label: 'daily roof climbs to check water level', icon: '🏠' },
+    {
+      value: '135L',
+      label: 'water wasted daily per household due to overflow',
+      icon: icons.droplet,
+    },
+    {
+      value: '23%',
+      label: 'of water pumps fail from running dry',
+      icon: icons.zap,
+    },
+    {
+      value: '2x',
+      label: 'daily roof climbs to check water level',
+      icon: icons.home,
+    },
   ];
 
   return (
-    <section className="py-24 px-6">
+    <section className="py-24 px-6 relative">
       <div className="max-w-6xl mx-auto">
         <FadeIn>
           <p className="text-sky-400 font-medium text-sm tracking-wider uppercase mb-4 text-center">The Problem</p>
@@ -161,7 +328,9 @@ function Problem() {
           {stats.map((stat, i) => (
             <FadeIn key={i} delay={i * 150}>
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 text-center hover:border-sky-500/30 transition-all">
-                <div className="text-4xl mb-4">{stat.icon}</div>
+                <div className="w-14 h-14 rounded-xl bg-sky-500/10 flex items-center justify-center mx-auto mb-4">
+                  {stat.icon}
+                </div>
                 <div className="text-4xl font-bold text-white mb-2">{stat.value}</div>
                 <p className="text-slate-400 text-sm">{stat.label}</p>
               </div>
@@ -176,7 +345,8 @@ function Problem() {
 // ─── SOLUTION ───────────────────────────────────────────────────────────────
 function Solution() {
   return (
-    <section className="py-24 px-6 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <section className="py-24 px-6 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative">
+      <WaterSurface className="top-0 h-16 opacity-50" />
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
         <FadeIn>
           <p className="text-sky-400 font-medium text-sm tracking-wider uppercase mb-4">The Solution</p>
@@ -208,7 +378,6 @@ function Solution() {
         </FadeIn>
 
         <FadeIn delay={200}>
-          {/* PLACEHOLDER: Product photo — receiver + transmitter */}
           <div className="bg-slate-800 rounded-2xl aspect-square flex items-center justify-center border border-slate-700">
             <div className="text-center p-8">
               <p className="text-slate-500 text-sm">Product photo placeholder</p>
@@ -254,7 +423,7 @@ function HowItWorks() {
 
         <div className="space-y-24">
           {steps.map((step, i) => (
-            <div key={i} className={`grid md:grid-cols-2 gap-12 items-center ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}>
+            <div key={i} className={`grid md:grid-cols-2 gap-12 items-center`}>
               <FadeIn className={i % 2 === 1 ? 'md:order-2' : ''}>
                 <div className="text-sky-500 font-mono text-6xl font-bold opacity-20 mb-4">{step.num}</div>
                 <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
@@ -276,19 +445,20 @@ function HowItWorks() {
 // ─── FEATURES ───────────────────────────────────────────────────────────────
 function Features() {
   const features = [
-    { icon: '📡', title: 'Long Range LoRa', desc: 'Up to 5km line-of-sight. Works through walls and across buildings.' },
-    { icon: '🔋', title: 'Low Power', desc: '6+ months battery life with deep sleep. Solar charging optional.' },
-    { icon: '📱', title: 'Real-Time Dashboard', desc: 'See water levels, battery, signal strength — all from your phone.' },
-    { icon: '🔔', title: 'Smart Alerts', desc: 'Low water, overflow risk, battery low, device offline — push to your phone.' },
-    { icon: '📊', title: 'Usage History', desc: 'Track water consumption patterns. Know when to schedule delivery.' },
-    { icon: '🏠', title: 'Home Assistant', desc: 'Native MQTT integration. Auto-discovery for seamless smart home setup.' },
-    { icon: '🔒', title: 'Secure by Design', desc: 'MQTT over TLS, per-user credentials, encrypted cloud connection.' },
-    { icon: '📦', title: 'Multi-Tank', desc: 'Monitor up to 10 tanks from one receiver. Perfect for farms and buildings.' },
-    { icon: '🔄', title: 'OTA Updates', desc: 'Update firmware wirelessly. New features delivered over the air.' },
+    { icon: icons.radio, title: 'Long Range LoRa', desc: 'Up to 5km line-of-sight. Works through walls and across buildings.' },
+    { icon: icons.battery, title: 'Low Power', desc: '6+ months battery life with deep sleep. Solar charging optional.' },
+    { icon: icons.phone, title: 'Real-Time Dashboard', desc: 'See water levels, battery, signal strength — all from your phone.' },
+    { icon: icons.bell, title: 'Smart Alerts', desc: 'Low water, overflow risk, battery low, device offline — push to your phone.' },
+    { icon: icons.chart, title: 'Usage History', desc: 'Track water consumption patterns. Know when to schedule delivery.' },
+    { icon: icons.homeAssistant, title: 'Home Assistant', desc: 'Native MQTT integration. Auto-discovery for seamless smart home setup.' },
+    { icon: icons.shield, title: 'Secure by Design', desc: 'MQTT over TLS, per-user credentials, encrypted cloud connection.' },
+    { icon: icons.layers, title: 'Multi-Tank', desc: 'Monitor up to 10 tanks from one receiver. Perfect for farms and buildings.' },
+    { icon: icons.refresh, title: 'OTA Updates', desc: 'Update firmware wirelessly. New features delivered over the air.' },
   ];
 
   return (
-    <section id="features" className="py-24 px-6 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <section id="features" className="py-24 px-6 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative">
+      <WaterSurface className="bottom-0 h-16 opacity-40" />
       <div className="max-w-6xl mx-auto">
         <FadeIn>
           <p className="text-sky-400 font-medium text-sm tracking-wider uppercase mb-4 text-center">Features</p>
@@ -299,7 +469,9 @@ function Features() {
           {features.map((f, i) => (
             <FadeIn key={i} delay={i * 80}>
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover:border-sky-500/30 hover:bg-slate-900 transition-all group">
-                <div className="text-3xl mb-4 group-hover:scale-110 transition-transform">{f.icon}</div>
+                <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center mb-4 group-hover:bg-sky-500/20 transition-colors">
+                  {f.icon}
+                </div>
                 <h3 className="font-semibold text-lg mb-2">{f.title}</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
               </div>
@@ -375,7 +547,6 @@ function TechSpecs() {
 
 // ─── PRICING ────────────────────────────────────────────────────────────────
 function Pricing({ onGetStarted }) {
-  // Detect India by timezone (simple, no API call)
   const isIndia = Intl.DateTimeFormat().resolvedOptions().timeZone?.startsWith('Asia/Calcutta') ||
                   Intl.DateTimeFormat().resolvedOptions().timeZone?.startsWith('Asia/Kolkata');
 
@@ -415,13 +586,13 @@ function Pricing({ onGetStarted }) {
     },
     {
       name: 'Pro',
-      price: isIndia ? '299' : '4.99',
+      price: isIndia ? '599' : '9.99',
       currency: isIndia ? '₹' : '$',
       period: '/month',
-      annual: isIndia ? '₹2,499/year (save 30%)' : '$49/year (save 18%)',
+      annual: isIndia ? '₹4,999/year (save 30%)' : '$99/year (save 17%)',
       desc: 'For installers and property managers',
       features: [
-        'Unlimited sites and tanks',
+        'Up to 10 sites, 50 tanks',
         '1-year history',
         'Fleet dashboard',
         'Client sharing (read-only links)',
@@ -513,7 +684,6 @@ function Hardware() {
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <FadeIn>
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden hover:border-sky-500/30 transition-all">
-              {/* PLACEHOLDER: Single tank kit photo */}
               <div className="bg-slate-800 aspect-[4/3] flex items-center justify-center">
                 <p className="text-slate-600 text-xs">Single Tank Kit photo — 800x600</p>
               </div>
@@ -534,7 +704,6 @@ function Hardware() {
 
           <FadeIn delay={150}>
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden hover:border-sky-500/30 transition-all">
-              {/* PLACEHOLDER: Dual tank kit photo */}
               <div className="bg-slate-800 aspect-[4/3] flex items-center justify-center">
                 <p className="text-slate-600 text-xs">Dual Tank Kit photo — 800x600</p>
               </div>

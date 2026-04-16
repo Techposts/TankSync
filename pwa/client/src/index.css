@@ -113,6 +113,33 @@ body {
   border-radius: 8px;
 }
 
+/* ─── Landing page water effects ─── */
+@keyframes bubble-rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.2; }
+  100% { transform: translateY(-100vh) scale(0.5); opacity: 0; }
+}
+
+.landing-bubble {
+  background: radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.4), rgba(14, 165, 233, 0.1));
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  animation: bubble-rise linear infinite;
+}
+
+@keyframes wave-drift-1 {
+  0%, 100% { d: path("M0,30 C240,10 480,50 720,30 C960,10 1200,50 1440,30 L1440,60 L0,60Z"); }
+  50% { d: path("M0,25 C300,50 540,10 780,35 C1020,55 1260,15 1440,25 L1440,60 L0,60Z"); }
+}
+
+@keyframes wave-drift-2 {
+  0%, 100% { d: path("M0,35 C300,55 600,15 900,35 C1200,55 1350,20 1440,35 L1440,60 L0,60Z"); }
+  50% { d: path("M0,40 C200,20 500,50 800,30 C1100,10 1300,45 1440,40 L1440,60 L0,60Z"); }
+}
+
+.landing-wave-1 { animation: wave-drift-1 6s ease-in-out infinite; }
+.landing-wave-2 { animation: wave-drift-2 8s ease-in-out infinite; }
+
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
