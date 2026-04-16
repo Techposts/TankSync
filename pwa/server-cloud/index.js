@@ -279,63 +279,52 @@ app.delete('/api/devices/:id', { preHandler: [app.authenticate] }, async (req, r
 });
 
 // ─── QR CODE DEVICE LINKING ────────────────────────────────────────────────────
+// The phone (on LAN) verifies the receiver token and discovers devices,
+// then sends the pre-verified data here. The server never contacts the receiver.
 
 app.post('/api/link/claim', { preHandler: [app.authenticate] }, async (req, reply) => {
-  const { device_id, token, receiver_ip } = req.body || {};
-  if (!device_id || !token || !receiver_ip) return reply.code(400).send({ error: 'Missing device_id, token, or receiver_ip' });
+  const { device_id, receiver_ip, verified, tanks, transmitters } = req.body || {};
+  if (!device_id || !receiver_ip) return reply.code(400).send({ error: 'Missing device_id or receiver_ip' });
+  if (!verified) return reply.code(400).send({ error: 'Token not verified by client' });
 
-  let receiverData;
-  try {
-    const resp = await fetch(`http://${receiver_ip}/api/link`, { signal: AbortSignal.timeout(5000) });
-    receiverData = await resp.json();
-  } catch {
-    return reply.code(502).send({ error: 'Could not reach receiver. Make sure the server and receiver are on the same network.' });
+  // Check if already linked
+  const existing = await db.get('SELECT id FROM sites WHERE user_id = $1 AND mqtt_device_id = $2', req.user.id, device_id);
+  if (existing) {
+    // Still generate MQTT creds if missing
+    let mqttCreds = null;
+    try { mqttCreds = await generateMqttCredentials(req.user.id, existing.id, device_id); } catch {}
+    return { site_id: existing.id, message: 'Device already linked', already_linked: true, mqtt: mqttCreds };
   }
 
-  if (receiverData.device_id !== device_id || receiverData.token !== token)
-    return reply.code(403).send({ error: 'Invalid or expired link token.' });
-
-  const existing = await db.get('SELECT id FROM sites WHERE user_id = $1 AND mqtt_device_id = $2', req.user.id, device_id);
-  if (existing) return { site_id: existing.id, message: 'Device already linked', already_linked: true };
-
+  // Create site
   const site = await db.run('INSERT INTO sites (user_id, name, receiver_ip, mqtt_device_id) VALUES ($1, $2, $3, $4)',
     req.user.id, 'My Tank', receiver_ip, device_id);
   const siteId = site.lastInsertRowid;
 
+  // Add discovered tanks (sent by the phone)
   let deviceCount = 0;
-  try {
-    const dataResp = await fetch(`http://${receiver_ip}/api/data`, { signal: AbortSignal.timeout(5000) });
-    const data = await dataResp.json();
-    if (data.tanks?.length > 0) {
-      for (const tank of data.tanks) {
-        try {
-          await db.run('INSERT INTO devices (site_id, lora_address, name) VALUES ($1, $2, $3)', siteId, tank.address, tank.name || `Tank ${tank.address}`);
-          deviceCount++;
-        } catch {}
-      }
+  if (tanks?.length > 0) {
+    for (const tank of tanks) {
+      try {
+        await db.run('INSERT INTO devices (site_id, lora_address, name) VALUES ($1, $2, $3)',
+          siteId, tank.address, tank.name || `Tank ${tank.address}`);
+        deviceCount++;
+      } catch {}
     }
-  } catch {}
+  }
 
-  try {
-    const txResp = await fetch(`http://${receiver_ip}/api/transmitters`, { signal: AbortSignal.timeout(5000) });
-    const txData = await txResp.json();
-    if (txData.transmitters) {
-      for (const tx of txData.transmitters) {
-        await db.run('UPDATE devices SET tank_capacity_l=$1, min_distance_cm=$2, max_distance_cm=$3, fw_version=$4 WHERE site_id=$5 AND lora_address=$6',
-          tx.capacity, tx.min_dist, tx.max_dist, tx.fw_version || null, siteId, tx.address);
-      }
+  // Update with transmitter details
+  if (transmitters?.length > 0) {
+    for (const tx of transmitters) {
+      await db.run('UPDATE devices SET tank_capacity_l=$1, min_distance_cm=$2, max_distance_cm=$3, fw_version=$4 WHERE site_id=$5 AND lora_address=$6',
+        tx.capacity, tx.min_dist, tx.max_dist, tx.fw_version || null, siteId, tx.address);
     }
-  } catch {}
+  }
 
-  // 6. Generate MQTT credentials and push to receiver
-  let mqtt_configured = false;
+  // Generate MQTT credentials (server-side only — phone pushes to receiver)
   let mqttCreds = null;
   try {
     mqttCreds = await generateMqttCredentials(req.user.id, siteId, device_id);
-    mqtt_configured = await pushMqttToReceiver(receiver_ip, mqttCreds);
-    if (mqtt_configured) {
-      app.log.info(`MQTT auto-configured on receiver ${receiver_ip} — user ${mqttCreds.mqtt_username}`);
-    }
   } catch (err) {
     app.log.warn(`MQTT credential setup failed: ${err.message}`);
   }
@@ -343,11 +332,8 @@ app.post('/api/link/claim', { preHandler: [app.authenticate] }, async (req, repl
   return {
     site_id: siteId,
     device_count: deviceCount,
-    mqtt_configured,
-    mqtt_host: mqttCreds?.mqtt_host,
-    message: mqtt_configured
-      ? 'Device linked and MQTT configured automatically'
-      : 'Device linked. Configure MQTT manually in the receiver web UI.',
+    mqtt: mqttCreds,
+    message: 'Device linked successfully',
   };
 });
 
