@@ -1,25 +1,52 @@
-# Build files
+# Build artifacts (ESP-IDF)
 **/build/
-*.bin
-*.elf
-*.map
+**/sdkconfig
+**/sdkconfig.old
+**/dependencies.lock
+**/managed_components/
 
-# BUT keep firmware release binaries
-!firmware/**/*.bin
+# Node.js
+node_modules/
+dist/
+*.log
+npm-debug.log*
 
-# IDE files
+# Environment & secrets
+.env
+.env.local
+.env.production
+
+# IDE
 .vscode/
 .idea/
 *.code-workspace
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Claude settings
+# Private / AI tooling
 .claude/
 
-# Temporary files
+# Caches
+.cache/
+__pycache__/
+
+# Legacy / dev directories (not part of release)
+v2-qr-linking/
+Receiver-ESP32-DevKit/
+Receiver-IDF/
+Transmitter-IDF/
+tanksync-pwa/
+
+# Large binaries (use GitHub Releases instead)
+*.bin
+*.elf
+*.map
+*.zip
+*.pdf
+
+# Temporary
 *.tmp
 *.bak
 *~

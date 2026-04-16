@@ -1,0 +1,85 @@
+name: Build & Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: receiver
+            path: firmware/receiver
+            target: esp32
+            binary: tanksync_receiver.bin
+          - name: receiver-c3
+            path: firmware/receiver-c3
+            target: esp32c3
+            binary: tanksync_receiver.bin
+          - name: transmitter
+            path: firmware/transmitter
+            target: esp32c3
+            binary: tanksync_transmitter.bin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4
+          target: ${{ matrix.target }}
+          path: ${{ matrix.path }}
+
+      - name: Rename binary
+        run: |
+          cp ${{ matrix.path }}/build/${{ matrix.binary }} \
+             tanksync-${{ matrix.name }}-${{ github.ref_name }}.bin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: tanksync-${{ matrix.name }}-${{ github.ref_name }}.bin
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            receiver/tanksync-receiver-${{ github.ref_name }}.bin
+            receiver-c3/tanksync-receiver-c3-${{ github.ref_name }}.bin
+            transmitter/tanksync-transmitter-${{ github.ref_name }}.bin
+          generate_release_notes: true
+          body: |
+            ## Firmware Binaries
+
+            | Binary | Board | Description |
+            |--------|-------|-------------|
+            | `tanksync-receiver-${{ github.ref_name }}.bin` | ESP32 DevKit | Receiver firmware |
+            | `tanksync-receiver-c3-${{ github.ref_name }}.bin` | ESP32-C3 | Receiver firmware (C3 variant) |
+            | `tanksync-transmitter-${{ github.ref_name }}.bin` | ESP32-C3 | Transmitter firmware |
+
+            ### Flashing
+            ```bash
+            # Receiver (ESP32 DevKit)
+            esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-${{ github.ref_name }}.bin
+
+            # Receiver (ESP32-C3)
+            esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-${{ github.ref_name }}.bin
+
+            # Transmitter (ESP32-C3)
+            esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-${{ github.ref_name }}.bin
+            ```
+
+            Or use the **OTA update** via the receiver's web UI.
