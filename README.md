@@ -1,12 +1,12 @@
 # TankSync - LoRa Water Tank Monitor
 
 [![License: MIT](https://img.shields.io/badge/Firmware-MIT-green.svg)](LICENSE)
-[![License: AGPL-3.0](https://img.shields.io/badge/PWA-AGPL--3.0-blue.svg)](pwa/LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/Cloud-AGPL--3.0-blue.svg)](pwa/LICENSE)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.4-red.svg)](https://docs.espressif.com/projects/esp-idf/)
 [![GitHub Release](https://img.shields.io/github/v/release/Techposts/LoRa-Water-Tank-Monitor)](https://github.com/Techposts/LoRa-Water-Tank-Monitor/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/Techposts/LoRa-Water-Tank-Monitor)](https://github.com/Techposts/LoRa-Water-Tank-Monitor/stargazers)
 
-Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and an optional cloud dashboard. Monitor multiple tanks from up to 5km away with no WiFi needed between sensor and receiver.
+Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and a cloud dashboard. Monitor multiple tanks from up to 5km away with no WiFi needed between sensor and receiver.
 
 <p align="center">
   <img src="docs/images/receiver.jpg" width="45%" alt="Receiver" />
@@ -27,12 +27,12 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
                                                           |
                                               +-----------+-----------+
                                               |                       |
-                                         MQTT/WiFi              Web UI
+                                       MQTT over TLS            Web UI
                                               |              192.168.x.x
                                     +---------+---------+
                                     |                   |
                               Home Assistant      TankSync Cloud
-                              (auto-discovery)    (web dashboard)
+                              (auto-discovery)    tanksync.smartghar.org
 ```
 
 ## Features
@@ -43,10 +43,13 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 - **Local Display**: SH1106 1.3" OLED on receiver shows tank levels, battery, signal
 - **Web UI**: Built-in configuration interface on the receiver (WiFi, MQTT, LoRa, OTA)
 - **Home Assistant**: Native MQTT auto-discovery integration
-- **TankSync Cloud**: Web dashboard with push notifications, multi-site monitoring, QR device linking
+- **TankSync Cloud**: Web dashboard with push notifications, multi-tank monitoring, QR device linking
+- **MQTT over TLS**: Secure communication between receiver and cloud (port 8883)
 - **OTA Updates**: WiFi OTA for receiver, LoRa OTA relay for transmitter
 - **Captive Portal**: Auto-redirect WiFi setup on iOS, Android, and Windows
 - **Remote Config**: Push sleep interval and sample count to transmitters over LoRa
+- **Email Verification**: Resend API + Cloudflare Turnstile on signup
+- **Auto MQTT Provisioning**: QR code scan auto-configures receiver's cloud MQTT connection
 
 ## Hardware
 
@@ -71,13 +74,13 @@ Download the latest `.bin` files from [Releases](https://github.com/Techposts/Lo
 
 ```bash
 # Receiver (ESP32 DevKit)
-esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-v2.1.0.bin
+esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-vX.Y.Z.bin
 
 # Receiver (ESP32-C3 SuperMini)
-esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-v2.1.0.bin
+esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-vX.Y.Z.bin
 
 # Transmitter (ESP32-C3)
-esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-v2.1.0.bin
+esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-vX.Y.Z.bin
 ```
 
 ### Option 2: Build from Source
@@ -114,18 +117,18 @@ idf.py -p /dev/ttyACM0 flash
 
 A web dashboard for monitoring your tanks from anywhere. Use the hosted version or self-host your own.
 
-**Hosted:** [tanksync.smartghar.org](https://tanksync.smartghar.org) -- scan the QR code from your receiver's web UI to link your device.
+**Hosted:** [tanksync.smartghar.org](https://tanksync.smartghar.org) -- sign up, scan the QR code from your receiver's web UI, and your tank data flows to the cloud automatically.
 
 **Self-host:**
 ```bash
 cd pwa
 npm install
-cp .env.example .env    # Edit with your MQTT broker details
+cp .env.example .env    # Edit with your MQTT broker and API keys
 npm run build
 npm start               # Runs on http://localhost:4800
 ```
 
-Features: multi-site management, push notifications, QR code device linking, dark/light themes, historical charts.
+Features: multi-tank monitoring, push notifications, QR code device linking, email verification, dark/light themes, historical charts.
 
 See [pwa/deploy/](pwa/deploy/) for production deployment with systemd and Nginx.
 
@@ -144,12 +147,22 @@ firmware/
   receiver/          ESP32 DevKit receiver (MIT)
   receiver-c3/       ESP32-C3 receiver variant (MIT)
   transmitter/       ESP32-C3 transmitter (MIT)
-pwa/                 TankSync Cloud dashboard (AGPL-3.0)
-  server/            Fastify + SQLite + MQTT bridge
+pwa/
+  server/            Fastify + SQLite server (self-host) (AGPL-3.0)
+  server-cloud/      Fastify + PostgreSQL server (cloud deploy) (AGPL-3.0)
   client/            React + Tailwind frontend
+  deploy/            Systemd, Nginx, and deploy scripts
 hardware/            BOM and hardware designs (CC BY-SA 4.0)
 docs/                Documentation and images
+.github/workflows/
+  build-firmware.yml  Automated firmware builds on tag push
+  deploy-cloud.yml    CI/CD deploy to DigitalOcean on push
 ```
+
+## CI/CD
+
+- **Firmware**: Push a version tag (`git tag v2.2.0 && git push origin v2.2.0`) to auto-build all 3 firmware binaries and create a GitHub Release
+- **Cloud**: Push changes to `pwa/` on main to auto-deploy to the production server via SSH
 
 ## LoRa Message Protocol
 
@@ -160,12 +173,23 @@ Config Downlink:          SET:SLEEP=<seconds>:SAMP=<count>
 Pairing:                  PAIR_REQ / PAIR_ACK:<addr>:<name>
 ```
 
+## Security
+
+- MQTT over TLS (Let's Encrypt certificates, auto-renewing)
+- Per-user MQTT credentials with topic-level ACL
+- Cloudflare Turnstile captcha on signup
+- Email verification via Resend API
+- Rate limiting on auth endpoints (5 register/min, 10 login/min)
+- JWT tokens with 30-day expiry
+- Security headers (X-Frame-Options, CSP, HSTS via Cloudflare)
+- UFW firewall, fail2ban, SSH key-only deploy
+
 ## License
 
 | Component | License | Details |
 |-----------|---------|---------|
 | Firmware (`firmware/`) | [MIT](LICENSE) | Free for any use |
-| Web App (`pwa/`) | [AGPL-3.0](pwa/LICENSE) | Must share source if hosted as a service |
+| Cloud App (`pwa/`) | [AGPL-3.0](pwa/LICENSE) | Must share source if hosted as a service |
 | Hardware (`hardware/`) | [CC BY-SA 4.0](hardware/LICENSE) | Attribution + ShareAlike |
 
 ## Contributing
