@@ -1,11 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
+// Load Turnstile script once globally
+let turnstileLoaded = false;
+function loadTurnstileScript() {
+  if (turnstileLoaded || !TURNSTILE_SITE_KEY) return;
+  if (document.getElementById('cf-turnstile-script')) { turnstileLoaded = true; return; }
+  const script = document.createElement('script');
+  script.id = 'cf-turnstile-script';
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  script.async = true;
+  document.head.appendChild(script);
+  turnstileLoaded = true;
+}
+
 export default function Login() {
-  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'verify'
+  const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -14,58 +27,21 @@ export default function Login() {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const turnstileRef = useRef(null);
-  const turnstileWidgetId = useRef(null);
   const { login, register, verifyEmail, resendCode, needsVerification, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
 
-  // If logged in and verified, redirect (run once, not on every render)
   useEffect(() => {
-    if (user && !needsVerification) {
-      navigate(redirectTo, { replace: true });
-    } else if (user && needsVerification && mode !== 'verify') {
+    if (user && !needsVerification) navigate(redirectTo, { replace: true });
+    else if (user && needsVerification && mode !== 'verify') {
       setEmail(user.email);
       setMode('verify');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, needsVerification]);
 
-  // Load Turnstile script for registration
-  useEffect(() => {
-    if (!TURNSTILE_SITE_KEY || mode !== 'register') return;
-    if (document.getElementById('cf-turnstile-script')) return;
-
-    const script = document.createElement('script');
-    script.id = 'cf-turnstile-script';
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    script.async = true;
-    script.onload = () => renderTurnstile();
-    document.head.appendChild(script);
-    return () => {};
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode === 'register' && TURNSTILE_SITE_KEY && window.turnstile && turnstileRef.current) {
-      renderTurnstile();
-    }
-  }, [mode]);
-
-  function renderTurnstile() {
-    if (!window.turnstile || !turnstileRef.current) return;
-    if (turnstileWidgetId.current) window.turnstile.remove(turnstileWidgetId.current);
-    turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
-      sitekey: TURNSTILE_SITE_KEY,
-      theme: 'dark',
-      callback: () => {},
-    });
-  }
-
-  function getTurnstileToken() {
-    if (!TURNSTILE_SITE_KEY || !window.turnstile || turnstileWidgetId.current == null) return '';
-    return window.turnstile.getResponse(turnstileWidgetId.current) || '';
-  }
+  // Preload Turnstile script (no widget rendered — invisible mode)
+  useEffect(() => { loadTurnstileScript(); }, []);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -74,6 +50,23 @@ export default function Login() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  // Get Turnstile token invisibly (execute on demand)
+  const getTurnstileToken = useCallback(() => {
+    return new Promise((resolve) => {
+      if (!TURNSTILE_SITE_KEY || !window.turnstile) { resolve(''); return; }
+      try {
+        const widgetId = window.turnstile.render(document.createElement('div'), {
+          sitekey: TURNSTILE_SITE_KEY,
+          size: 'invisible',
+          callback: (token) => { resolve(token); },
+          'error-callback': () => { resolve(''); },
+          'expired-callback': () => { resolve(''); },
+        });
+        window.turnstile.execute(widgetId);
+      } catch { resolve(''); }
+    });
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -81,9 +74,9 @@ export default function Login() {
     setLoading(true);
     try {
       if (mode === 'register') {
-        const turnstileToken = getTurnstileToken();
+        const turnstileToken = await getTurnstileToken();
         if (TURNSTILE_SITE_KEY && !turnstileToken) {
-          setError('Please complete the captcha');
+          setError('Verification failed. Please try again.');
           setLoading(false);
           return;
         }
@@ -138,7 +131,7 @@ export default function Login() {
         </p>
       </div>
 
-      {/* Form card */}
+      {/* Form */}
       <div className="w-full max-w-sm">
         <form onSubmit={handleSubmit} className="space-y-4" autoComplete={mode === 'verify' ? 'off' : 'on'}>
           {mode === 'verify' ? (
@@ -187,9 +180,6 @@ export default function Login() {
                     focus:border-water focus:ring-1 focus:ring-water/50 outline-none transition-all"
                   placeholder="At least 6 characters" />
               </div>
-              {mode === 'register' && TURNSTILE_SITE_KEY && (
-                <div ref={turnstileRef} className="flex justify-center" />
-              )}
             </>
           )}
 
