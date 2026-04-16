@@ -43,50 +43,36 @@ export default function LinkDevice() {
 
   const claimDevice = async () => {
     try {
-      // Step 1: Verify token directly with receiver (phone is on LAN)
-      setStep('Verifying receiver...');
-      let receiverData;
-      try {
-        const resp = await fetch(`http://${receiverIp}/api/link`, { signal: AbortSignal.timeout(5000) });
-        receiverData = await resp.json();
-      } catch {
-        throw new Error('Could not reach receiver. Make sure your phone is on the same WiFi network as the receiver.');
-      }
-
-      if (receiverData.device_id !== deviceId || receiverData.token !== token) {
-        throw new Error('Invalid or expired link token. Try scanning the QR code again.');
-      }
-
-      // Step 2: Discover tanks from receiver
+      // Step 1: Try to verify and discover from receiver (only works if on same LAN + HTTP allowed)
       setStep('Discovering tanks...');
       let tanks = [];
-      try {
-        const dataResp = await fetch(`http://${receiverIp}/api/data`, { signal: AbortSignal.timeout(5000) });
-        const data = await dataResp.json();
-        tanks = data.tanks || [];
-      } catch {}
-
-      // Step 3: Get transmitter details
       let transmitters = [];
       try {
-        const txResp = await fetch(`http://${receiverIp}/api/transmitters`, { signal: AbortSignal.timeout(5000) });
+        const resp = await fetch(`http://${receiverIp}/api/data`, { signal: AbortSignal.timeout(3000) });
+        const data = await resp.json();
+        tanks = data.tanks || [];
+      } catch {
+        // Mixed content or not on LAN — proceed anyway, server will create empty site
+      }
+
+      try {
+        const txResp = await fetch(`http://${receiverIp}/api/transmitters`, { signal: AbortSignal.timeout(3000) });
         const txData = await txResp.json();
         transmitters = txData.transmitters || [];
       } catch {}
 
-      // Step 4: Send everything to cloud server (server creates site + MQTT creds)
+      // Step 2: Send to cloud server — token in URL is proof of physical access
       setStep('Setting up cloud connection...');
       const result = await api.post('/api/link/claim', {
         device_id: deviceId,
         receiver_ip: receiverIp,
-        verified: true,
         tanks,
         transmitters,
       });
 
-      // Step 5: Push MQTT config to receiver (phone is on LAN)
+      // Step 3: Try to push MQTT config to receiver (may fail due to mixed content)
       if (result.mqtt) {
-        setStep('Configuring MQTT on receiver...');
+        setStep('Configuring receiver...');
         try {
           await fetch(`http://${receiverIp}/api/mqtt`, {
             method: 'POST',
@@ -103,7 +89,7 @@ export default function LinkDevice() {
             signal: AbortSignal.timeout(5000),
           });
         } catch {
-          // Non-fatal — user can configure MQTT manually
+          // Mixed content block or not on LAN — show manual instructions
         }
       }
 

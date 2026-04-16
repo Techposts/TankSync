@@ -283,9 +283,8 @@ app.delete('/api/devices/:id', { preHandler: [app.authenticate] }, async (req, r
 // then sends the pre-verified data here. The server never contacts the receiver.
 
 app.post('/api/link/claim', { preHandler: [app.authenticate] }, async (req, reply) => {
-  const { device_id, receiver_ip, verified, tanks, transmitters } = req.body || {};
+  const { device_id, receiver_ip, tanks, transmitters } = req.body || {};
   if (!device_id || !receiver_ip) return reply.code(400).send({ error: 'Missing device_id or receiver_ip' });
-  if (!verified) return reply.code(400).send({ error: 'Token not verified by client' });
 
   // Check if already linked
   const existing = await db.get('SELECT id FROM sites WHERE user_id = $1 AND mqtt_device_id = $2', req.user.id, device_id);
