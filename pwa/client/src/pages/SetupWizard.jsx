@@ -61,13 +61,17 @@ export default function SetupWizard() {
           if (code && code.data) {
             try {
               const parsed = new URL(code.data);
+              // New format: http://<ip>/claim — open directly (receiver handles redirect)
+              if (parsed.pathname === '/claim') {
+                stopScan();
+                window.location.href = code.data;
+              }
+              // Old format: https://cloud/link?id=...&token=...&ip=...
               const id = parsed.searchParams.get('id');
               const token = parsed.searchParams.get('token');
               const ip = parsed.searchParams.get('ip');
-
               if (id && token && ip) {
                 stopScan();
-                // Redirect to LinkDevice page which handles the full claim flow
                 window.location.href = `/link?id=${id}&token=${token}&ip=${ip}`;
               }
             } catch {} // Not a valid URL — keep scanning
