@@ -31,7 +31,8 @@ jobs:
         working-directory: pwa
         run: |
           cp package-cloud.json package.json
-          npm install
+          cp package-cloud-lock.json package-lock.json
+          npm ci
 
       - name: Build frontend
         working-directory: pwa
