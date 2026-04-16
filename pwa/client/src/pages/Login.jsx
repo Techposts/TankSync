@@ -140,7 +140,7 @@ export default function Login() {
 
       {/* Form card */}
       <div className="w-full max-w-sm">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete={mode === 'verify' ? 'off' : 'on'}>
           {mode === 'verify' ? (
             <>
               <p className="text-sm text-slate-400 text-center">
@@ -153,7 +153,7 @@ export default function Login() {
                 value={code}
                 onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
                 required
-                autoFocus
+                autoComplete="one-time-code"
                 className="w-full px-4 py-4 rounded-xl bg-surface border border-slate-700 text-white text-center
                   text-2xl tracking-[0.5em] font-mono focus:border-water focus:ring-1 focus:ring-water/50 outline-none transition-all"
                 placeholder="000000"
@@ -165,6 +165,7 @@ export default function Login() {
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Name</label>
                   <input type="text" value={name} onChange={e => setName(e.target.value)}
+                    autoComplete="name"
                     className="w-full px-4 py-3 rounded-xl bg-surface border border-slate-700 text-white
                       focus:border-water focus:ring-1 focus:ring-water/50 outline-none transition-all"
                     placeholder="Your name" />
@@ -173,6 +174,7 @@ export default function Login() {
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                  autoComplete={mode === 'register' ? 'email' : 'username'}
                   className="w-full px-4 py-3 rounded-xl bg-surface border border-slate-700 text-white
                     focus:border-water focus:ring-1 focus:ring-water/50 outline-none transition-all"
                   placeholder="you@example.com" />
@@ -180,6 +182,7 @@ export default function Login() {
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                   className="w-full px-4 py-3 rounded-xl bg-surface border border-slate-700 text-white
                     focus:border-water focus:ring-1 focus:ring-water/50 outline-none transition-all"
                   placeholder="At least 6 characters" />
