@@ -16,7 +16,7 @@ jobs:
     env:
       DROPLET_IP: "168.144.32.179"
       APP_DIR: "/home/tanksync/tanksync-pwa"
-      VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+      VITE_TURNSTILE_SITE_KEY: "0x4AAAAAAC-RFHMP2e8ZwGG5"  # public site key (not secret)
 
     steps:
       - uses: actions/checkout@v4
