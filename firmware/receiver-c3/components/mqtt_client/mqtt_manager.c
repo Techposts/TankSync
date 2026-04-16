@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 /**
  * mqtt_manager implementation
  */
 
 #include "mqtt_manager.h"
 #include "mqtt_client.h"        // ESP-IDF MQTT (component: mqtt)
+#include "esp_tls.h"
+#include "esp_crt_bundle.h"     // ESP-IDF certificate bundle for TLS
 #include "transmitter_registry.h"
 #include "wifi_manager.h"
 #include "esp_log.h"
@@ -56,11 +55,13 @@ static void load_config(void) {
     nvs_get_str(h, "user", s_cfg.user, &len);
     len = sizeof(s_cfg.pass);
     nvs_get_str(h, "pass", s_cfg.pass, &len);
-    uint8_t en = 0, ha = 0;
+    uint8_t en = 0, ha = 0, tls = 0;
     nvs_get_u8(h, "enabled", &en);
     nvs_get_u8(h, "ha_disc", &ha);
+    nvs_get_u8(h, "use_tls", &tls);
     s_cfg.enabled      = (en != 0);
     s_cfg.ha_discovery = (ha != 0);
+    s_cfg.use_tls      = (tls != 0);
     nvs_close(h);
 }
 
@@ -74,6 +75,7 @@ static esp_err_t save_config_nvs(const mqtt_mgr_config_t *cfg) {
     if (strlen(cfg->pass) > 0) nvs_set_str(h, "pass", cfg->pass); // only update if provided
     nvs_set_u8 (h, "enabled", cfg->enabled ? 1 : 0);
     nvs_set_u8 (h, "ha_disc", cfg->ha_discovery ? 1 : 0);
+    nvs_set_u8 (h, "use_tls", cfg->use_tls ? 1 : 0);
     err = nvs_commit(h);
     nvs_close(h);
     return err;
@@ -149,10 +151,13 @@ void mqtt_manager_start(void) {
     char client_id[32];
     snprintf(client_id, sizeof(client_id), "tanksync_%s", s_dev_id);
 
+    uint16_t port = s_cfg.port ? s_cfg.port : (s_cfg.use_tls ? 8883 : MQTT_DEFAULT_PORT);
+
     esp_mqtt_client_config_t cfg = {
         .broker.address.hostname         = s_cfg.host,
-        .broker.address.port             = s_cfg.port ? s_cfg.port : MQTT_DEFAULT_PORT,
-        .broker.address.transport        = MQTT_TRANSPORT_OVER_TCP,
+        .broker.address.port             = port,
+        .broker.address.transport        = s_cfg.use_tls ? MQTT_TRANSPORT_OVER_SSL : MQTT_TRANSPORT_OVER_TCP,
+        .broker.verification.crt_bundle_attach   = s_cfg.use_tls ? esp_crt_bundle_attach : NULL,
         .credentials.client_id           = client_id,
         .credentials.username            = strlen(s_cfg.user) ? s_cfg.user : NULL,
         .credentials.authentication.password = strlen(s_cfg.pass) ? s_cfg.pass : NULL,
@@ -363,6 +368,7 @@ esp_err_t mqtt_manager_set_config(const mqtt_mgr_config_t *cfg) {
     strncpy(s_cfg.user, cfg->user, sizeof(s_cfg.user) - 1);
     s_cfg.enabled      = cfg->enabled;
     s_cfg.ha_discovery = cfg->ha_discovery;
+    s_cfg.use_tls      = cfg->use_tls;
 
     mqtt_manager_stop();
     if (s_cfg.enabled && strlen(s_cfg.host) > 0 &&

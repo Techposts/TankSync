@@ -15,6 +15,7 @@ import db, { stmts } from './db.js';
 import { connectMqtt } from './mqtt.js';
 import { addClient } from './sse.js';
 import { checkDeviceTimeouts } from './alerts.js';
+import { generateMqttCredentials, pushMqttToReceiver, revokeMqttCredentials } from './mqtt-credentials.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
@@ -208,8 +209,10 @@ app.put('/api/sites/:id', { preHandler: [app.authenticate] }, async (req, reply)
 });
 
 app.delete('/api/sites/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
-  const result = await db.run('DELETE FROM sites WHERE id = $1 AND user_id = $2', req.params.id, req.user.id);
-  if (result.changes === 0) return reply.code(404).send({ error: 'Site not found' });
+  const site = await db.get('SELECT * FROM sites WHERE id = $1 AND user_id = $2', req.params.id, req.user.id);
+  if (!site) return reply.code(404).send({ error: 'Site not found' });
+  await revokeMqttCredentials(site.id);
+  await db.run('DELETE FROM sites WHERE id = $1', site.id);
   return { success: true };
 });
 
@@ -324,7 +327,28 @@ app.post('/api/link/claim', { preHandler: [app.authenticate] }, async (req, repl
     }
   } catch {}
 
-  return { site_id: siteId, device_count: deviceCount, message: 'Device linked successfully' };
+  // 6. Generate MQTT credentials and push to receiver
+  let mqtt_configured = false;
+  let mqttCreds = null;
+  try {
+    mqttCreds = await generateMqttCredentials(req.user.id, siteId, device_id);
+    mqtt_configured = await pushMqttToReceiver(receiver_ip, mqttCreds);
+    if (mqtt_configured) {
+      app.log.info(`MQTT auto-configured on receiver ${receiver_ip} — user ${mqttCreds.mqtt_username}`);
+    }
+  } catch (err) {
+    app.log.warn(`MQTT credential setup failed: ${err.message}`);
+  }
+
+  return {
+    site_id: siteId,
+    device_count: deviceCount,
+    mqtt_configured,
+    mqtt_host: mqttCreds?.mqtt_host,
+    message: mqtt_configured
+      ? 'Device linked and MQTT configured automatically'
+      : 'Device linked. Configure MQTT manually in the receiver web UI.',
+  };
 });
 
 // ─── HISTORY ───────────────────────────────────────────────────────────────────

@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 /**
  * web_server implementation - TankSync Terminal UI v3.5
  */
@@ -652,6 +649,7 @@ static esp_err_t handle_get_mqtt(httpd_req_t *req) {
                             (ms == MQTT_ST_ERROR)        ? "error"        : "disabled";
     cJSON *root = cJSON_CreateObject(); cJSON_AddStringToObject(root, "host", cfg.host); cJSON_AddNumberToObject(root, "port", cfg.port);
     cJSON_AddStringToObject(root, "user", cfg.user); cJSON_AddBoolToObject(root, "enabled", cfg.enabled); cJSON_AddBoolToObject(root, "ha_discovery", cfg.ha_discovery);
+    cJSON_AddBoolToObject(root, "use_tls", cfg.use_tls);
     cJSON_AddStringToObject(root, "live_status", mqtt_live);
     char *json = cJSON_PrintUnformatted(root); cJSON_Delete(root); send_json(req, json); free(json); return ESP_OK;
 }
@@ -664,6 +662,7 @@ static esp_err_t handle_post_mqtt(httpd_req_t *req) {
     if (u) { strncpy(cfg.user, u, sizeof(cfg.user)-1); }
     if (p) { strncpy(cfg.pass, p, sizeof(cfg.pass)-1); }
     cfg.port = (uint16_t)cJSON_GetNumberValue(cJSON_GetObjectItem(j, "port")); cfg.enabled = cJSON_IsTrue(cJSON_GetObjectItem(j, "enabled")); cfg.ha_discovery = cJSON_IsTrue(cJSON_GetObjectItem(j, "ha_discovery"));
+    cfg.use_tls = cJSON_IsTrue(cJSON_GetObjectItem(j, "use_tls"));
     cJSON_Delete(j); if (mqtt_manager_set_config(&cfg) == ESP_OK) { send_ok(req, "OK"); } else { send_err(req, "NO"); }
     return ESP_OK;
 }

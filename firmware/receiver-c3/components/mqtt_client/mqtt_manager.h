@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 /**
  * mqtt_manager - MQTT publishing for TankSync receiver
  *
@@ -41,7 +38,7 @@
 #define MQTT_RECONNECT_BASE_MS  5000
 #endif
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION        "2.1.0"
+#define FIRMWARE_VERSION        "2.2.0"
 #endif
 
 typedef enum {
@@ -59,6 +56,7 @@ typedef struct {
     char    pass[64];
     bool    enabled;
     bool    ha_discovery;
+    bool    use_tls;        // true = MQTTS (port 8883), false = plain TCP (1883)
 } mqtt_mgr_config_t;
 
 /** Initialize: load config from NVS, derive device_id from MAC. */
