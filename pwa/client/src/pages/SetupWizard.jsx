@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSites } from '../hooks/useSites.jsx';
@@ -312,8 +309,8 @@ export default function SetupWizard() {
         {/* Name (first-time only) */}
         {currentStep === 'name' && (
           <div className="animate-in fade-in">
-            <h2 className="text-2xl font-bold text-white mb-2">Name Your Site</h2>
-            <p className="text-slate-400 mb-6 text-sm">Give this installation a name so you can identify it later.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Name Your Location</h2>
+            <p className="text-slate-400 mb-6 text-sm">Give this location a name so you can identify it later (e.g. Home, Farm, Office).</p>
 
             <input
               type="text"

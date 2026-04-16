@@ -46,6 +46,11 @@ html, body, #root {
   overscroll-behavior: none;
 }
 
+/* Prevent iOS auto-zoom on input focus (requires 16px minimum) */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-tap-highlight-color: transparent;

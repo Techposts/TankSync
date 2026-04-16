@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSites } from '../hooks/useSites.jsx';
@@ -25,11 +22,11 @@ export default function Dashboard() {
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">No Sites Yet</h2>
-        <p className="text-slate-400 mb-6 text-sm max-w-xs">Connect your TankSync receiver to start monitoring.</p>
+        <h2 className="text-xl font-bold text-white mb-2">No Tanks Yet</h2>
+        <p className="text-slate-400 mb-6 text-sm max-w-xs">Connect your TankSync receiver to start monitoring your water tanks.</p>
         <button onClick={() => navigate('/setup')}
           className="px-6 py-3 rounded-xl bg-water text-white font-semibold active:scale-[0.98] transition-all">
-          Add Your First Site
+          Connect Your Tank
         </button>
       </div>
     );
@@ -58,7 +55,7 @@ export default function Dashboard() {
 
   return (
     <div className="px-4 pt-1 pb-24">
-      {/* Site header */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-2xl font-bold text-white">{activeSite?.name || 'Dashboard'}</h1>
@@ -71,7 +68,7 @@ export default function Dashboard() {
         </div>
         {sites.length > 1 && (
           <button onClick={() => navigate('/sites')}
-            className="text-xs text-water bg-water/10 px-3 py-1.5 rounded-lg font-medium">Switch Site</button>
+            className="text-xs text-water bg-water/10 px-3 py-1.5 rounded-lg font-medium">Switch Location</button>
         )}
       </div>
 

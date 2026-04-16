@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2025-2026 Ravi Singh (Techposts)
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useSites } from '../hooks/useSites.jsx';
@@ -152,14 +149,14 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Sites management */}
-      <Section title="Sites" action={
+      {/* Locations */}
+      <Section title="Locations" action={
         <button onClick={() => navigate('/setup')} className="text-xs text-water font-medium">
           Add Tank
         </button>
       }>
         {sites.length === 0 ? (
-          <div className="text-sm text-slate-400 py-4 text-center">No sites configured</div>
+          <div className="text-sm text-slate-400 py-4 text-center">No locations configured</div>
         ) : (
           <div className="space-y-2">
             {sites.map(site => (
@@ -187,7 +184,7 @@ export default function Settings() {
                         )}
                       </div>
                       <div className="text-xs text-slate-400 font-mono">{site.receiver_ip || 'No IP'}</div>
-                      <div className="text-xs text-slate-500">{site.deviceCount || 0} devices</div>
+                      <div className="text-xs text-slate-500">{site.deviceCount || 0} tank{(site.deviceCount || 0) !== 1 ? 's' : ''}</div>
                     </div>
                     <div className="flex gap-1">
                       {site.id !== activeSite?.id && (
