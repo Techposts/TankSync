@@ -75,8 +75,11 @@ bool registry_set_enabled(uint16_t addr, bool enabled);
 /** Set remote config parameters to be pushed to transmitter on next wake. */
 bool registry_set_remote_config(uint16_t addr, uint32_t sleep_s, uint8_t samples);
 
-/** Check if pending config exists, fills output if yes and clears flag. */
+/** Check if pending config exists, fills output if yes. Does NOT clear flag. */
 bool registry_get_pending_config(uint16_t addr, uint32_t *sleep_out, uint8_t *samples_out);
+
+/** Clear pending config flag after SET_ACK is received from transmitter. */
+bool registry_clear_pending_config(uint16_t addr);
 
 /** Mark all transmitters as needing an OTA update. */
 void registry_set_all_ota_pending(bool pending);

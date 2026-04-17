@@ -458,10 +458,25 @@ bool registry_get_pending_config(uint16_t addr, uint32_t *sleep_out, uint8_t *sa
     if (idx >= 0 && s_infos[idx].pending_config) {
         if (sleep_out)   *sleep_out   = s_infos[idx].sleep_s;
         if (samples_out) *samples_out = s_infos[idx].samples;
-        s_infos[idx].pending_config = false; // CLEAR
-        save_json();
+        // DO NOT clear here — cleared only on SET_ACK receipt
+        // so config retries automatically on next TX wake if delivery fails
         UNLOCK();
         return true;
+    }
+    UNLOCK();
+    return false;
+}
+
+bool registry_clear_pending_config(uint16_t addr) {
+    LOCK();
+    for (int i = 0; i < s_count; i++) {
+        if (s_infos[i].address == addr && s_infos[i].pending_config) {
+            s_infos[i].pending_config = false;
+            save_json();
+            UNLOCK();
+            ESP_LOGI(TAG, "Config confirmed for addr %d — pending cleared", addr);
+            return true;
+        }
     }
     UNLOCK();
     return false;

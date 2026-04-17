@@ -62,6 +62,8 @@ export default function TankDetail() {
       max_distance_cm: device.max_distance_cm,
       alert_low_pct: device.alert_low_pct,
       alert_high_pct: device.alert_high_pct,
+      sleep_s: device.sleep_s || 300,
+      samples: device.samples || 5,
     });
     setEditing(true);
   };
@@ -136,37 +138,62 @@ export default function TankDetail() {
 
       {/* Edit form */}
       {editing && (
-        <div className="bg-surface rounded-2xl p-4 mb-6">
-          <h3 className="text-sm font-semibold text-white mb-4">Device Settings</h3>
-          <div className="space-y-3">
-            <Field label="Tank Name" value={editForm.name}
-              onChange={v => setEditForm({...editForm, name: v})} />
-            <Field label="Tank Capacity (Liters)" type="number" value={editForm.tank_capacity_l}
-              onChange={v => setEditForm({...editForm, tank_capacity_l: parseInt(v) || 0})} />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Sensor Min (cm)" type="number" value={editForm.min_distance_cm}
-                onChange={v => setEditForm({...editForm, min_distance_cm: parseInt(v) || 0})}
-                help="Distance when tank is FULL" />
-              <Field label="Sensor Max (cm)" type="number" value={editForm.max_distance_cm}
-                onChange={v => setEditForm({...editForm, max_distance_cm: parseInt(v) || 0})}
-                help="Distance when tank is EMPTY" />
+        <div className="space-y-4 mb-6">
+          <div className="bg-surface rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-4">Tank Info</h3>
+            <div className="space-y-3">
+              <Field label="Tank Name" value={editForm.name}
+                onChange={v => setEditForm({...editForm, name: v})} />
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-slate-800/50 border border-slate-700">
+                <span className="text-xs text-slate-500">LoRa Address</span>
+                <span className="text-sm text-slate-300 font-mono ml-auto">#{device.lora_address}</span>
+              </div>
             </div>
+          </div>
+          <div className="bg-surface rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-4">Sensor Calibration</h3>
+            <div className="space-y-3">
+              <Field label="Tank Capacity (Liters)" type="number" value={editForm.tank_capacity_l}
+                onChange={v => setEditForm({...editForm, tank_capacity_l: parseInt(v) || 0})} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Distance at Full (cm)" type="number" value={editForm.min_distance_cm}
+                  onChange={v => setEditForm({...editForm, min_distance_cm: parseInt(v) || 0})}
+                  help="Sensor to water when tank is full" />
+                <Field label="Distance at Empty (cm)" type="number" value={editForm.max_distance_cm}
+                  onChange={v => setEditForm({...editForm, max_distance_cm: parseInt(v) || 0})}
+                  help="Sensor to tank bottom when empty" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-surface rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-4">Transmitter Settings</h3>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Low Alert (%)" type="number" value={editForm.alert_low_pct}
+              <Field label="Sleep Interval (sec)" type="number" value={editForm.sleep_s}
+                onChange={v => setEditForm({...editForm, sleep_s: Math.max(60, parseInt(v) || 60)})}
+                help="60-86400 sec" />
+              <Field label="Sensor Samples" type="number" value={editForm.samples}
+                onChange={v => setEditForm({...editForm, samples: Math.min(20, Math.max(3, parseInt(v) || 5))})}
+                help="3-20 readings per wake" />
+            </div>
+          </div>
+          <div className="bg-surface rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-4">Alert Thresholds</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Low Water Alert (%)" type="number" value={editForm.alert_low_pct}
                 onChange={v => setEditForm({...editForm, alert_low_pct: parseInt(v) || 0})} />
-              <Field label="High Alert (%)" type="number" value={editForm.alert_high_pct}
+              <Field label="High Water Alert (%)" type="number" value={editForm.alert_high_pct}
                 onChange={v => setEditForm({...editForm, alert_high_pct: parseInt(v) || 0})} />
             </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setEditing(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-600 text-slate-300 text-sm font-medium">
-                Cancel
-              </button>
-              <button onClick={handleSave} disabled={saving}
-                className="flex-1 py-2.5 rounded-xl bg-water text-white text-sm font-semibold disabled:opacity-50">
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setEditing(false)}
+              className="flex-1 py-2.5 rounded-xl border border-slate-600 text-slate-300 text-sm font-medium">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-water text-white text-sm font-semibold disabled:opacity-50">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
         </div>
       )}

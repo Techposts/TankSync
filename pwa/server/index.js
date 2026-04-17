@@ -168,15 +168,16 @@ app.put('/api/devices/:id', { preHandler: [app.authenticate] }, async (req, repl
     SELECT d.*, s.receiver_ip FROM devices d JOIN sites s ON d.site_id = s.id WHERE d.id = ? AND s.user_id = ?
   `).get(req.params.id, req.user.id);
   if (!device) return reply.code(404).send({ error: 'Device not found' });
-  const { name, tank_capacity_l, min_distance_cm, max_distance_cm, alert_low_pct, alert_high_pct } = req.body || {};
+  const { name, tank_capacity_l, min_distance_cm, max_distance_cm, alert_low_pct, alert_high_pct, sleep_s, samples } = req.body || {};
 
   // Update local DB
   db.prepare(`UPDATE devices SET
     name = COALESCE(?, name), tank_capacity_l = COALESCE(?, tank_capacity_l),
     min_distance_cm = COALESCE(?, min_distance_cm), max_distance_cm = COALESCE(?, max_distance_cm),
-    alert_low_pct = COALESCE(?, alert_low_pct), alert_high_pct = COALESCE(?, alert_high_pct)
+    alert_low_pct = COALESCE(?, alert_low_pct), alert_high_pct = COALESCE(?, alert_high_pct),
+    sleep_s = COALESCE(?, sleep_s), samples = COALESCE(?, samples)
     WHERE id = ?`
-  ).run(name, tank_capacity_l, min_distance_cm, max_distance_cm, alert_low_pct, alert_high_pct, device.id);
+  ).run(name, tank_capacity_l, min_distance_cm, max_distance_cm, alert_low_pct, alert_high_pct, sleep_s, samples, device.id);
 
   // Forward config to receiver so it updates its registry (used for distance→% conversion)
   let receiver_synced = false;
@@ -192,6 +193,8 @@ app.put('/api/devices/:id', { preHandler: [app.authenticate] }, async (req, repl
           min_dist: updated.min_distance_cm,
           max_dist: updated.max_distance_cm,
           capacity: updated.tank_capacity_l,
+          sleep: updated.sleep_s,
+          samples: updated.samples,
         }),
         signal: AbortSignal.timeout(5000),
       });

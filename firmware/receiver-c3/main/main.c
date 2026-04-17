@@ -76,7 +76,8 @@ static void on_lora_raw_rx(uint16_t src_addr, const char *payload,
         // Give ACK sem so lora_ota_task unblocks and sees offset mismatch
         xSemaphoreGive(s_ota_ack_sem);
     } else if (strcmp(payload, "SET_ACK") == 0) {
-        ESP_LOGI(TAG, "Config acknowledged by %d", src_addr);
+        ESP_LOGI(TAG, "Config acknowledged by %d — clearing pending flag", src_addr);
+        registry_clear_pending_config(src_addr);
     } else {
         ESP_LOGD(TAG, "Raw from %d: %s", src_addr, payload);
     }
@@ -119,36 +120,8 @@ static void on_lora_rx(const lora_rx_packet_t *pkt) {
             if (ota_busy) {
                 ESP_LOGW(TAG, "OTA task already running — skipping for %d", pkt->src_addr);
             } else {
-                // Send OTA_START immediately from rx_task context (same as ACK).
-                // This guarantees delivery within the TX's 8s downlink window.
-                // The OTA task will wait for OTA_READY before sending chunks.
-                // Drain stale semaphores HERE (before OTA_START), not in the OTA task.
-                // OTA_READY can arrive before xTaskCreate completes — draining in the
-                // task would discard the real OTA_READY.
                 xSemaphoreTake(s_ota_ready_sem, 0);
                 xSemaphoreTake(s_ota_ack_sem,   0);
-                FILE *fchk = fopen("/spiffs/tx_fw.bin", "rb");
-                if (fchk) {
-                    fseek(fchk, 0, SEEK_END);
-                    uint32_t fw_size = (uint32_t)ftell(fchk);
-                    fclose(fchk);
-                    char ota_cmd[48];
-                    snprintf(ota_cmd, sizeof(ota_cmd), "OTA_START:%" PRIu32, fw_size);
-                    // Send OTA_START 3 times with delays — same reliability
-                    // pattern as PAIR_ACK.  Single LoRa sends are unreliable
-                    // due to half-duplex timing and module TX→RX transitions.
-                    // The TX's handle_downlink() window is 8s, plenty of time.
-                    vTaskDelay(pdMS_TO_TICKS(500)); // let ACK RF complete
-                    ESP_LOGI(TAG, "Sending OTA_START to %d (%"PRIu32" bytes) 3x from rx_task",
-                             pkt->src_addr, fw_size);
-                    for (int r = 0; r < 3; r++) {
-                        lora_send(pkt->src_addr, ota_cmd);
-                        vTaskDelay(pdMS_TO_TICKS(600)); // let RF complete
-                    }
-                    ESP_LOGI(TAG, "OTA_START sent 3x — switching to SF7/500kHz for chunks");
-                    lora_send_cmd("AT+PARAMETER=7,9,1,12", 1500);
-                }
-                // Spawn task to handle OTA_READY + chunk streaming
                 ESP_LOGI(TAG, "Triggering LoRa OTA task for %d", pkt->src_addr);
                 xTaskCreate(lora_ota_task, "lo_ota", 4096, (void*)(uintptr_t)pkt->src_addr, 5, NULL);
             }
@@ -723,10 +696,6 @@ static void lora_ota_task(void *arg) {
     uint16_t addr = (uint16_t)(uintptr_t)arg;
     ESP_LOGI(TAG, "LoRa OTA start → addr %d", addr);
 
-    // NOTE: semaphores are drained in on_lora_rx BEFORE OTA_START is sent,
-    // not here. Draining here would discard OTA_READY that arrived between
-    // OTA_START and xTaskCreate (race condition).
-
     FILE *f = fopen("/spiffs/tx_fw.bin", "rb");
     if (!f) {
         ESP_LOGE(TAG, "No staged firmware at /spiffs/tx_fw.bin");
@@ -741,22 +710,70 @@ static void lora_ota_task(void *arg) {
     rewind(f);
     ESP_LOGI(TAG, "Firmware size: %" PRIu32 " bytes", total_size);
 
+    // ── Version check: skip OTA if TX already runs the staged firmware ──────
+    char staged_ver[32] = {0};
+    {
+        uint8_t scan[256];
+        size_t scan_off = 0;
+        bool found = false;
+        rewind(f);
+        while (scan_off < 4096 && !found) {
+            size_t n = fread(scan, 1, sizeof(scan), f);
+            if (n < 4) break;
+            for (size_t i = 0; i + 48 <= n; i += 4) {
+                uint32_t w = (uint32_t)scan[i] | ((uint32_t)scan[i+1]<<8)
+                           | ((uint32_t)scan[i+2]<<16) | ((uint32_t)scan[i+3]<<24);
+                if (w == 0xABCD5432u) {
+                    memcpy(staged_ver, &scan[i + 16], 31);
+                    staged_ver[31] = '\0';
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && n == sizeof(scan)) {
+                fseek(f, -(long)48, SEEK_CUR);
+                scan_off += sizeof(scan) - 48;
+            } else if (!found) break;
+        }
+        rewind(f);
+    }
+    if (staged_ver[0]) {
+        int idx = registry_find(addr);
+        if (idx >= 0) {
+            tx_data_t data;
+            if (registry_get_data(idx, &data) && data.fw_version[0] &&
+                strcmp(data.fw_version, staged_ver) == 0) {
+                ESP_LOGI(TAG, "TX %d already running v%s — skipping OTA", addr, staged_ver);
+                fclose(f);
+                registry_set_ota_progress(addr, 0, false);
+                s_ota_task_start_us = 0;
+                vTaskDelete(NULL);
+                return;
+            }
+        }
+        ESP_LOGI(TAG, "Staged firmware: v%s", staged_ver);
+    }
+
+    // ── Step 0: Send OTA_START to TX (at normal SF9/125kHz) ─────────────────
+    char ota_start_cmd[48];
+    snprintf(ota_start_cmd, sizeof(ota_start_cmd), "OTA_START:%" PRIu32, total_size);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ESP_LOGI(TAG, "Sending OTA_START to %d (%" PRIu32 " bytes) 3x", addr, total_size);
+    for (int r = 0; r < 3; r++) {
+        lora_send(addr, ota_start_cmd);
+        vTaskDelay(pdMS_TO_TICKS(600));
+    }
+
+    ESP_LOGI(TAG, "Switching to SF7/500kHz for OTA chunks");
+    lora_send_cmd("AT+PARAMETER=7,9,1,12", 1500);
+
     // ── Step 1: Wait for TX to be ready ─────────────────────────────────────
-    // OTA_START was sent from rx_task context.  The TX calls esp_ota_begin
-    // (fast with SEQUENTIAL_WRITES) then sends OTA_READY.  Due to half-duplex
-    // LoRa timing, OTA_READY often arrives while our module is still switching
-    // from TX→RX, so the preamble is missed.
-    //
-    // Instead of hard-failing on OTA_READY timeout, we wait up to 3s for it
-    // as a courtesy, but proceed regardless.  The TX is ready ~1.5s after
-    // OTA_START, so a 3s delay is more than sufficient.
-    ESP_LOGI(TAG, "Waiting up to 3s for OTA_READY from %d...", addr);
-    if (xSemaphoreTake(s_ota_ready_sem, pdMS_TO_TICKS(3000)) == pdTRUE) {
+    ESP_LOGI(TAG, "Waiting up to 8s for OTA_READY from %d...", addr);
+    if (xSemaphoreTake(s_ota_ready_sem, pdMS_TO_TICKS(8000)) == pdTRUE) {
         ESP_LOGI(TAG, "OTA_READY received — proceeding");
     } else {
-        ESP_LOGW(TAG, "OTA_READY not received (half-duplex timing) — proceeding anyway");
+        ESP_LOGW(TAG, "OTA_READY not received — proceeding anyway (TX may be ready)");
     }
-    // Give TX an extra moment to be fully ready
     vTaskDelay(pdMS_TO_TICKS(500));
     // ── Step 2: stream chunks ─────────────────────────────────────────────────
     char cmd[256];
@@ -842,8 +859,23 @@ static void lora_ota_task(void *arg) {
 
     if (!failed) {
         lora_send(addr, "OTA_END");
-        ESP_LOGI(TAG, "OTA_END sent — waiting for OTA_DONE from transmitter");
-        // OTA_DONE handled in on_lora_raw_rx → registry_set_ota_progress(addr, 0, false)
+        ESP_LOGI(TAG, "OTA_END sent — waiting for OTA_DONE (still at SF7)");
+
+        bool got_done = false;
+        for (int i = 0; i < 10; i++) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            bool ota_p = false; uint32_t ota_o = 0;
+            registry_get_ota_status(addr, &ota_p, &ota_o);
+            if (!ota_p) {
+                ESP_LOGI(TAG, "OTA_DONE received from %d — OTA complete", addr);
+                got_done = true;
+                break;
+            }
+        }
+        if (!got_done) {
+            ESP_LOGW(TAG, "OTA_DONE not received after 10s — assuming success (TX rebooted)");
+            registry_set_ota_progress(addr, 0, false);
+        }
     } else {
         registry_set_ota_progress(addr, 0, false);
     }

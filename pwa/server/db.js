@@ -47,6 +47,8 @@ db.exec(`
     max_distance_cm REAL DEFAULT 150,
     alert_low_pct INTEGER DEFAULT 20,
     alert_high_pct INTEGER DEFAULT 95,
+    sleep_s INTEGER DEFAULT 300,
+    samples INTEGER DEFAULT 5,
     fw_version TEXT,
     last_seen TEXT,
     last_water_pct REAL,
