@@ -547,6 +547,8 @@ static esp_err_t handle_api_system(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "ip", wifi_manager_ip());
     cJSON_AddStringToObject(root, "ssid", wifi_manager_ssid());
     cJSON_AddStringToObject(root, "wifi_status", wifi_manager_status() == WIFI_ST_CONNECTED ? "connected" : "ap_mode");
+    cJSON_AddStringToObject(root, "device_id", mqtt_manager_device_id());
+    cJSON_AddStringToObject(root, "mdns_host", wifi_manager_mdns_host());
     cJSON_AddNumberToObject(root, "uptime_s", (double)(esp_timer_get_time() / 1000000LL));
     cJSON_AddNumberToObject(root, "free_heap", esp_get_free_heap_size());
     char *json = cJSON_PrintUnformatted(root); cJSON_Delete(root); send_json(req, json); free(json);

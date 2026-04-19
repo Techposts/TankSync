@@ -57,5 +57,8 @@ const char *wifi_manager_ssid(void);
 /** Get WiFi RSSI in STA mode (0 if not connected). */
 int wifi_manager_rssi(void);
 
+/** Get mDNS hostname (e.g. "tanksync-a1b2"). */
+const char *wifi_manager_mdns_host(void);
+
 /** Scan for nearby networks. Returns JSON array string (caller must free). */
 char *wifi_manager_scan_json(void);

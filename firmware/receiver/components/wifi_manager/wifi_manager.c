@@ -27,10 +27,21 @@
 static const char *TAG = "wifi";
 
 #define NVS_NS          "wifi"
-#define AP_SSID         "TankSync"
+#define AP_SSID_BASE    "TankSync"
 #define AP_PASS         ""
 #define AP_IP           "192.168.4.1"
-#define MDNS_HOST       "tanksync"
+#define MDNS_HOST_BASE  "tanksync"
+
+// Unique AP SSID and mDNS hostname (appends last 4 hex of MAC)
+static char s_ap_ssid[24]   = AP_SSID_BASE;
+static char s_mdns_host[24] = MDNS_HOST_BASE;
+
+static void build_unique_ids(void) {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(s_ap_ssid, sizeof(s_ap_ssid), "%s-%02X%02X", AP_SSID_BASE, mac[4], mac[5]);
+    snprintf(s_mdns_host, sizeof(s_mdns_host), "%s-%02x%02x", MDNS_HOST_BASE, mac[4], mac[5]);
+}
 #define CONNECT_TIMEOUT_MS  20000
 
 // System event bits (same definitions as config.h)
@@ -41,7 +52,7 @@ static const char *TAG = "wifi";
 static EventGroupHandle_t s_events = NULL;
 static wifi_status_t      s_status = WIFI_ST_DISCONNECTED;
 static char               s_ip[20] = AP_IP;
-static char               s_ssid[33] = AP_SSID;
+static char               s_ssid[33] = AP_SSID_BASE;
 static esp_netif_t       *s_sta_netif = NULL;
 static esp_netif_t       *s_ap_netif  = NULL;
 static int                s_retry = 0;
@@ -86,11 +97,13 @@ esp_err_t wifi_manager_forget(void) {
 
 // ── mDNS ──────────────────────────────────────────────────────────────────────
 static void start_mdns(void) {
+    build_unique_ids();
     mdns_init();
-    mdns_hostname_set(MDNS_HOST);
+    mdns_hostname_set(s_mdns_host);
     mdns_instance_name_set("TankSync Water Monitor");
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
-    ESP_LOGI(TAG, "mDNS: %s.local", MDNS_HOST);
+    mdns_service_add(NULL, "_tanksync", "_tcp", 80, NULL, 0);
+    ESP_LOGI(TAG, "mDNS: %s.local", s_mdns_host);
 }
 
 // ── Captive portal DNS (UDP port 53) ─────────────────────────────────────────
@@ -224,21 +237,22 @@ void wifi_manager_connect(void) {
 void wifi_manager_start_ap(void) {
     esp_wifi_stop();
     s_status = WIFI_ST_AP_MODE;
-    strncpy(s_ssid, AP_SSID, sizeof(s_ssid));
-    strncpy(s_ip,   AP_IP,   sizeof(s_ip));
+    build_unique_ids();
+    strncpy(s_ssid, s_ap_ssid, sizeof(s_ssid));
+    strncpy(s_ip,   AP_IP,     sizeof(s_ip));
 
     // Use APSTA mode so WiFi scan works while AP is active
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 
     wifi_config_t ap_cfg = {
         .ap = {
-            .ssid_len       = strlen(AP_SSID),
+            .ssid_len       = strlen(s_ap_ssid),
             .channel        = 6,
             .authmode       = WIFI_AUTH_OPEN,
             .max_connection = 4,
         }
     };
-    strncpy((char*)ap_cfg.ap.ssid, AP_SSID, sizeof(ap_cfg.ap.ssid));
+    strncpy((char*)ap_cfg.ap.ssid, s_ap_ssid, sizeof(ap_cfg.ap.ssid));
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -247,12 +261,13 @@ void wifi_manager_start_ap(void) {
     xTaskCreate(dns_server_task, "dns_cp", 4096, NULL, 5, NULL);
     start_mdns();
 
-    ESP_LOGI(TAG, "AP mode: SSID=%s, IP=%s", AP_SSID, AP_IP);
+    ESP_LOGI(TAG, "AP mode: SSID=%s, IP=%s, mDNS=%s.local", s_ap_ssid, AP_IP, s_mdns_host);
 }
 
 wifi_status_t wifi_manager_status(void)  { return s_status; }
 const char   *wifi_manager_ip(void)      { return s_ip; }
 const char   *wifi_manager_ssid(void)    { return s_ssid; }
+const char   *wifi_manager_mdns_host(void) { return s_mdns_host; }
 
 int wifi_manager_rssi(void) {
     if (s_status != WIFI_ST_CONNECTED) return 0;
