@@ -11,6 +11,24 @@ Authoritative wiring reference for the TankSync receiver (RX) and transmitter (T
 
 The TX is the energy-constrained device. The RX is intentionally indoor-and-plugged so its power budget (display + WiFi + LoRa-listen + LEDs) doesn't have to fit a small solar harvest.
 
+### Whole-system flow
+
+```mermaid
+flowchart LR
+    PANEL["Solar panel<br/>6V / 180mA"] --> MPPT["CN3791<br/>MPPT charger"]
+    MPPT --> BAT["18650 Li-ion<br/>3.0–4.2V"]
+    BAT --> BOOST["MT3608 boost<br/>3.7V → 5V"]
+    BOOST --> TX["TX board<br/>(ESP32-C3 SuperMini)"]
+    TX -- "AJ-SR04M ultrasonic" --> SONAR["Tank water level"]
+    TX -. "LoRa 865 MHz<br/>up to 5 km" .-> RX["RX board<br/>(ESP32 DevKit or C3)"]
+    USB["5V USB brick"] --> RX
+    RX --> OLED["SH1106 OLED<br/>display"]
+    RX --> LEDS["WS2812B<br/>status + water level"]
+    RX -- "WiFi STA" --> WIFI(("Home<br/>WiFi"))
+    RX -. "MQTT (HA)" .-> HA["Home Assistant<br/>or any MQTT broker"]
+    RX -. "HTTPS REST" .-> CLOUD(("TankSync<br/>Cloud (optional)"))
+```
+
 ---
 
 ## Receiver (RX) wiring
@@ -21,7 +39,37 @@ There are **two RX hardware variants** depending on the ESP32 chip on hand:
 
 Both variants use the **same external modules** (RYLR998 LoRa, SH1106 OLED, WS2812B LEDs). Only the GPIO assignments differ. Power comes from a 5V USB-C wall brick into the dev-board's USB connector; the on-board AMS1117-3.3 LDO derives the 3.3V rail used by RYLR998.
 
-### RX block diagram
+### RX circuit diagram
+
+```mermaid
+flowchart TB
+    USB[5V USB-C wall brick<br/>≥1.5A]
+    ESP[ESP32 board<br/>DevKit v1 OR<br/>C3 SuperMini]
+    LDO[On-board AMS1117-3.3<br/>5V → 3.3V LDO]
+    LORA[RYLR998 LoRa module<br/>UART @ 115200<br/>VCC = 3.3V]
+    OLED[SH1106 OLED<br/>128×64 I²C 0x3C<br/>3.3V or 5V tolerant]
+    LEDS[WS2812B × 2<br/>status + water-level<br/>VDD = 5V]
+    GND((Common GND))
+
+    USB -->|5V VBUS| ESP
+    ESP -->|5V rail| LEDS
+    ESP -->|5V rail| OLED
+    ESP -->|on-board LDO| LDO
+    LDO -->|3.3V| LORA
+    LDO -->|3.3V| OLED
+
+    ESP <-->|UART TX/RX| LORA
+    ESP -->|GPIO data| LEDS
+    ESP <-->|I²C SDA/SCL| OLED
+
+    USB -.-> GND
+    ESP -.-> GND
+    LORA -.-> GND
+    OLED -.-> GND
+    LEDS -.-> GND
+```
+
+### RX block diagram (alt-text view)
 
 ```
  [5V USB-C wall brick, ≥1.5A]
@@ -57,6 +105,30 @@ Source: `firmware/receiver/main/config.h`
 | 3.3V | Power | RYLR998 VCC, OLED VCC (3.3V variant) | From on-board LDO |
 | GND | Ground | All modules | Single common ground |
 
+#### Wire-by-wire — DevKit ESP32 RX
+
+Every wire you actually solder/breadboard, in order:
+
+```
+ESP32 DevKit GPIO13       →  WS2812B #1 DIN
+ESP32 DevKit 5V (VIN/USB) →  WS2812B #1 VDD
+ESP32 DevKit GND          →  WS2812B #1 GND
+WS2812B #1 DOUT           →  WS2812B #2 DIN  (chain)
+WS2812B #1 VDD            →  WS2812B #2 VDD
+WS2812B #1 GND            →  WS2812B #2 GND
+
+ESP32 DevKit GPIO16 (RX2) →  RYLR998 TXD
+ESP32 DevKit GPIO17 (TX2) →  RYLR998 RXD
+ESP32 DevKit 3.3V         →  RYLR998 VCC
+ESP32 DevKit GND          →  RYLR998 GND
+                             RYLR998 RST  (leave floating, or pull-up to 3.3V)
+
+ESP32 DevKit GPIO21       →  SH1106 OLED SDA
+ESP32 DevKit GPIO22       →  SH1106 OLED SCL
+ESP32 DevKit 3.3V or 5V   →  SH1106 OLED VCC  (most modules accept either)
+ESP32 DevKit GND          →  SH1106 OLED GND
+```
+
 ### Pin map — ESP32-C3 SuperMini RX
 
 Source: `firmware/receiver-c3/main/config.h`
@@ -72,6 +144,27 @@ Source: `firmware/receiver-c3/main/config.h`
 | 3.3V | Power | RYLR998 VCC, OLED VCC (3.3V variant) | From on-board LDO |
 | GND | Ground | All modules | Single common ground |
 
+#### Wire-by-wire — ESP32-C3 SuperMini RX
+
+```
+C3 SuperMini GPIO2        →  WS2812B #1 DIN
+C3 SuperMini 5V           →  WS2812B #1 VDD
+C3 SuperMini GND          →  WS2812B #1 GND
+WS2812B #1 DOUT           →  WS2812B #2 DIN  (chain)
+WS2812B #1 VDD            →  WS2812B #2 VDD
+WS2812B #1 GND            →  WS2812B #2 GND
+
+C3 SuperMini GPIO20 (RX1) →  RYLR998 TXD
+C3 SuperMini GPIO21 (TX1) →  RYLR998 RXD
+C3 SuperMini 3.3V         →  RYLR998 VCC
+C3 SuperMini GND          →  RYLR998 GND
+
+C3 SuperMini GPIO9        →  SH1106 OLED SDA
+C3 SuperMini GPIO10       →  SH1106 OLED SCL
+C3 SuperMini 3.3V or 5V   →  SH1106 OLED VCC
+C3 SuperMini GND          →  SH1106 OLED GND
+```
+
 ---
 
 ## Transmitter (TX) wiring — solar-powered, two power-monitoring variants
@@ -83,7 +176,57 @@ The TX is `firmware/transmitter/` (ESP32-C3 SuperMini). The board ships in two v
 
 The firmware **auto-detects** which variant is installed by I²C-scanning at INA219's default address (`0x40`) at boot. Users can also force a mode via the web UI dropdown (Auto / Force INA219 / Force voltage divider / Disabled). The mode is saved to NVS.
 
-### TX power chain
+### TX circuit diagram
+
+```mermaid
+flowchart TB
+    PANEL[Solar panel<br/>6V / 180mA crystalline]
+    MPPT[CN3791 MPPT<br/>Solar charger<br/>tracks Vmpp ≈ 4.5V]
+    BAT[18650 Li-ion<br/>3.0–4.2V<br/>protected]
+    VDIV{{"Variant A:<br/>100k / 100k divider<br/>→ GPIO0 ADC"}}
+    INA[INA219 module<br/>0.1Ω shunt<br/>I²C 0x40]
+    BOOST[MT3608 boost<br/>3.7V → 5.0V]
+    ESP[ESP32-C3 SuperMini<br/>VBUS = 5V]
+    LDO[on-board AMS1117<br/>3.3V LDO]
+    LORA[RYLR998 LoRa<br/>VCC = 3.3V]
+    SONAR[AJ-SR04M ultrasonic<br/>VCC = 5V]
+    LEDS[WS2812B × 2<br/>VDD = 5V]
+    BTN[Tactile button<br/>BOOT/PAIR/OTA]
+    GND((Common GND))
+
+    PANEL -->|Vin+/Vin-| MPPT
+    MPPT -->|BAT+/BAT-| BAT
+    BAT -. "Variant A wiring" .-> VDIV
+    BAT -. "Variant B wiring" .-> INA
+    INA -->|battery+ pass-through| BOOST
+    VDIV -. "(no shunt — direct)" .-> BOOST
+    BAT -->|3.7V nominal| BOOST
+    BOOST -->|+5V rail| ESP
+    BOOST -->|+5V| SONAR
+    BOOST -->|+5V| LEDS
+    ESP --> LDO
+    LDO -->|3.3V| LORA
+    LDO -. "(if Variant B)" .-> INA
+
+    ESP <-->|UART TX/RX| LORA
+    ESP <-->|TRIG/ECHO| SONAR
+    ESP -->|GPIO data| LEDS
+    ESP <-->|I²C SDA/SCL<br/>Variant B only| INA
+    ESP <-->|GPIO9 active-low| BTN
+
+    PANEL -.-> GND
+    MPPT -.-> GND
+    BAT -.-> GND
+    BOOST -.-> GND
+    ESP -.-> GND
+    LORA -.-> GND
+    SONAR -.-> GND
+    LEDS -.-> GND
+    INA -.-> GND
+    BTN -.-> GND
+```
+
+### TX power chain (alt-text view)
 
 ```
    ┌──────────────────────┐
@@ -146,6 +289,44 @@ Source: `firmware/transmitter/main/config.h` (BAT_ADC_CHANNEL = 0)
 | 21 | UART1 TX | RYLR998 RXD |
 | 1, 2, 3, 6, 10 | **FREE** | Reserved for future expansion |
 
+#### Wire-by-wire — TX Variant A
+
+Power chain wires:
+
+```
+Solar panel (+)            →  CN3791 IN+
+Solar panel (–)            →  CN3791 IN–
+CN3791 BAT+                →  18650 cell positive (via protection PCB)
+CN3791 BAT–                →  18650 cell negative (via protection PCB)
+
+18650 BAT+ (post-protect)  →  Junction A — splits to 3 places:
+                              (1) 100kΩ resistor → GPIO0 → 100kΩ → GND  (divider)
+                              (2) MT3608 boost VIN+
+18650 BAT– (post-protect)  →  Common GND  (also MT3608 GND, panel GND)
+
+MT3608 VOUT+               →  +5V rail — splits to:
+                              (1) C3 SuperMini 5V (VBUS)
+                              (2) WS2812B #1 VDD
+                              (3) AJ-SR04M VCC
+MT3608 VOUT–               →  Common GND
+MT3608 EN (optional)       →  C3 SuperMini GPIO10 (recommended for sleep gating)
+```
+
+Signal/sensor wires:
+
+```
+C3 SuperMini GPIO0         →  Voltage-divider midpoint (described above)
+C3 SuperMini GPIO4         →  AJ-SR04M TRIG
+C3 SuperMini GPIO5         →  AJ-SR04M ECHO
+C3 SuperMini GPIO7         →  WS2812B #1 DIN
+WS2812B #1 DOUT            →  WS2812B #2 DIN  (chain)
+C3 SuperMini GPIO9         →  Tactile button → GND  (uses internal pull-up)
+C3 SuperMini GPIO20 (RX1)  →  RYLR998 TXD
+C3 SuperMini GPIO21 (TX1)  →  RYLR998 RXD
+C3 SuperMini 3.3V (output) →  RYLR998 VCC
+C3 SuperMini GND           →  Common GND  (and all module GNDs)
+```
+
 ### TX pin map — Variant B (INA219 over I²C)
 
 Adds I²C bus on GPIO1/2; voltage divider is **not installed** (INA219's bus-voltage register replaces it).
@@ -163,6 +344,57 @@ Adds I²C bus on GPIO1/2; voltage divider is **not installed** (INA219's bus-vol
 | 20 | UART1 RX | RYLR998 TXD |
 | 21 | UART1 TX | RYLR998 RXD |
 | 3, 6, 10 | **FREE** | Reserved |
+
+#### Wire-by-wire — TX Variant B
+
+Power chain (note INA219 inserted in series with battery+):
+
+```
+Solar panel (+)            →  CN3791 IN+
+Solar panel (–)            →  CN3791 IN–
+CN3791 BAT+                →  Junction X (see below)
+CN3791 BAT–                →  Common GND
+
+18650 BAT+ (post-protect)  →  INA219 V+ (battery side of shunt)
+INA219 V–                  →  Junction X
+Junction X                 →  CN3791 BAT+  AND  MT3608 VIN+
+18650 BAT– (post-protect)  →  Common GND
+
+MT3608 VOUT+               →  +5V rail — splits to:
+                              (1) C3 SuperMini 5V (VBUS)
+                              (2) WS2812B #1 VDD
+                              (3) AJ-SR04M VCC
+MT3608 VOUT–               →  Common GND
+MT3608 EN (optional)       →  C3 SuperMini GPIO10 (recommended for sleep gating)
+```
+
+INA219 control wires:
+
+```
+C3 SuperMini GPIO1         →  INA219 SDA  (4.7kΩ pull-up to 3.3V — most modules include this)
+C3 SuperMini GPIO2         →  INA219 SCL  (4.7kΩ pull-up to 3.3V — same)
+C3 SuperMini 3.3V (output) →  INA219 VS  (powers the IC; ≠ load voltage)
+C3 SuperMini GND           →  INA219 GND
+```
+
+Notes on INA219 wiring:
+- **V+ goes to the battery side of the shunt**, V– goes to the common-node side. The chip's bus-voltage register reads V– (= load voltage = battery voltage minus tiny shunt drop). The shunt-voltage register is signed: positive when current flows from V+ to V– (discharging), negative when reversed (charging).
+- Address jumpers A0/A1 left **open** → I²C address `0x40` (default, what firmware probes).
+- Module is wired in series with **battery+** (high-side sensing). Don't accidentally place it between the panel and the charger — it must see both charge and discharge currents in opposite directions.
+
+Signal/sensor wires (identical to Variant A — same firmware binary):
+
+```
+C3 SuperMini GPIO4         →  AJ-SR04M TRIG
+C3 SuperMini GPIO5         →  AJ-SR04M ECHO
+C3 SuperMini GPIO7         →  WS2812B #1 DIN
+WS2812B #1 DOUT            →  WS2812B #2 DIN  (chain)
+C3 SuperMini GPIO9         →  Tactile button → GND
+C3 SuperMini GPIO20 (RX1)  →  RYLR998 TXD
+C3 SuperMini GPIO21 (TX1)  →  RYLR998 RXD
+C3 SuperMini 3.3V (output) →  RYLR998 VCC
+C3 SuperMini GND           →  Common GND
+```
 
 ### INA219 wiring detail (Variant B)
 
