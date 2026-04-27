@@ -13,7 +13,7 @@
 // ============================================================================
 // FIRMWARE
 // ============================================================================
-#define FIRMWARE_VERSION        "2.0.3"
+#define FIRMWARE_VERSION        "2.0.4"
 #define FIRMWARE_TYPE           "transmitter"
 
 // ============================================================================
@@ -55,18 +55,29 @@
 #define LORA_MAX_RETRIES        3           // Retry count if no ACK
 
 // ============================================================================
-// BATTERY - ADC on internal voltage divider
+// POWER MONITORING - Variant A (voltage divider) + Variant B (INA219 over I²C)
 // ============================================================================
-// ESP32-C3 can measure its own supply via ADC channel
-// Typical: VBAT → 100k → ADC pin → 100k → GND (1:2 divider)
-// Raw ADC range: 0-4095 (12-bit), Vref = 3.3V
-// Vbat = adc_mv * 2 (for 1:2 divider)
-#define BAT_ADC_CHANNEL         0               // ADC_CHANNEL_0 = GPIO0 (check schematic)
-#define BAT_DIVIDER_RATIO       2               // Voltage divider ratio
+// Variant A wiring: VBAT → 100k → ADC → 100k → GND (1:2 divider on GPIO0).
+//   ADC reads Vbat/2; firmware multiplies by BAT_DIVIDER_RATIO.
+// Variant B wiring: INA219 in series with battery+, I²C on GPIO1/2 at 0x40.
+//   Firmware auto-detects at boot by probing 0x40 over the I²C bus.
+//   NVS key "pwr_mode_ovr" forces a mode: auto / voltage / ina219 / disabled.
+//
+// Both variants share the same firmware binary; only the BOM differs.
+
+// Variant A (voltage divider)
+#define BAT_ADC_CHANNEL         0               // ADC_CHANNEL_0 = GPIO0
+#define BAT_DIVIDER_RATIO       2               // 1:2 divider
 #define BAT_MIN_MV              3000            // 0% (LiPo cutoff)
 #define BAT_MAX_MV              4200            // 100% (LiPo full charge)
-// Correction factor for ADC non-linearity (empirical; calibrate per board)
-#define BAT_ADC_CORRECTION      1.0f
+#define BAT_ADC_CORRECTION      1.0f            // Trim factor (empirical)
+
+// Variant B (INA219 over I²C)
+#define PIN_I2C_SDA             1               // GPIO1 → INA219 SDA
+#define PIN_I2C_SCL             2               // GPIO2 → INA219 SCL
+#define INA219_I2C_ADDR         0x40            // INA219 default (A0/A1 jumpers open)
+#define INA219_I2C_FREQ_HZ      100000          // 100 kHz standard mode
+// 0.1 Ω shunt → shunt_raw / 10 = current in mA (signed; +ve discharge, -ve charge)
 
 // ============================================================================
 // DEEP SLEEP

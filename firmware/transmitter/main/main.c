@@ -72,24 +72,30 @@ static void diagnostic_mode(void) {
              s_boot_count, s_msg_id, s_ack_failures);
 
     sensor_init(PIN_TRIG, PIN_ECHO);
-    battery_init(BAT_ADC_CHANNEL);
+    power_init(BAT_ADC_CHANNEL, PIN_I2C_SDA, PIN_I2C_SCL);
+    ESP_LOGI(TAG, "Power monitor mode: %s", power_mode_str(power_get_mode()));
 
     for (;;) {
         lora_tx_config_t cfg; lora_tx_get_config(&cfg);
         int dist_cm = -1;
         esp_err_t serr = sensor_read_cm(&dist_cm);
-        int bat_pct; uint32_t bat_mv;
-        battery_read(&bat_pct, &bat_mv);
+        power_reading_t pr = {0};
+        power_read(&pr);
 
-        ESP_LOGI(TAG, "dist=%dcm(%s) bat=%d%% %.2fV lora_addr=%d rx_addr=%d",
+        ESP_LOGI(TAG, "dist=%dcm(%s) bat=%d%% %.2fV (%s%s%ldmA) lora_addr=%d rx_addr=%d",
                  dist_cm, serr == ESP_OK ? "ok" : "err",
-                 bat_pct, (float)bat_mv / 1000.0f,
+                 pr.pct, (float)pr.vbat_mv / 1000.0f,
+                 power_mode_str(pr.mode), pr.charging ? " CHG " : " ",
+                 (long)pr.current_ma,
                  cfg.my_address, cfg.receiver_address);
 
         if (serr == ESP_OK && dist_cm > 0) {
             s_msg_id++;
-            bool acked = lora_tx_send(dist_cm, bat_pct,
-                                      (float)bat_mv / 1000.0f, s_msg_id);
+            bool acked = lora_tx_send(dist_cm, pr.pct,
+                                      (float)pr.vbat_mv / 1000.0f,
+                                      power_mode_char(pr.mode),
+                                      pr.current_ma, pr.power_mw,
+                                      s_msg_id);
             led_flash(PIN_LED, 100, acked ? 2 : 5);
         }
         vTaskDelay(pdMS_TO_TICKS(5000));
@@ -460,11 +466,16 @@ void app_main(void) {
     int dist_cm = -1;
     sensor_read_cm(&dist_cm);
 
-    battery_init(BAT_ADC_CHANNEL);
-    int bat_pct = 0;
-    uint32_t bat_mv = 3700;
-    battery_read(&bat_pct, &bat_mv);
+    power_init(BAT_ADC_CHANNEL, PIN_I2C_SDA, PIN_I2C_SCL);
+    power_reading_t pr = {0};
+    power_read(&pr);
+    int bat_pct = pr.pct;
+    uint32_t bat_mv = pr.vbat_mv > 0 ? pr.vbat_mv : 3700;
     float bat_v = (float)bat_mv / 1000.0f;
+    ESP_LOGI(TAG, "Power: mode=%s vbat=%lumV (%d%%) I=%ldmA P=%ldmW %s",
+             power_mode_str(pr.mode), (unsigned long)pr.vbat_mv, pr.pct,
+             (long)pr.current_ma, (long)pr.power_mw,
+             pr.charging ? "CHARGING" : "discharging");
 
     // ── 6. Low battery cutoff (audit #13) ──
     // Disabled for now — ADC reads noise (500-2800mV) without a real battery,
@@ -478,7 +489,10 @@ void app_main(void) {
 
     // ── 7. Send TANK packet ──
     s_msg_id++;
-    bool acked = lora_tx_send(dist_cm > 0 ? dist_cm : 0, bat_pct, bat_v, s_msg_id);
+    bool acked = lora_tx_send(dist_cm > 0 ? dist_cm : 0, bat_pct, bat_v,
+                              power_mode_char(pr.mode),
+                              pr.current_ma, pr.power_mw,
+                              s_msg_id);
 
     if (acked) {
         s_ack_failures = 0;

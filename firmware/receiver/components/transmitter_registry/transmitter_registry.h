@@ -58,6 +58,12 @@ typedef struct {
     bool      data_valid;
     tx_state_t state;
     char      fw_version[16];   // firmware version reported by transmitter
+
+    // Power telemetry (from TX firmware v2.0.4 onward)
+    char      power_mode;       // 'v'=voltage, 'i'=ina219, 'n'=disabled, '?'=unknown/old TX
+    int32_t   current_ma;       // signed; +ve = discharging, -ve = charging
+    int32_t   power_mw;         // V × I; 0 in voltage mode
+    bool      charging;         // true if INA219 reports negative current
 } tx_data_t;
 
 // ── Registry init ─────────────────────────────────────────────────────────────
@@ -97,9 +103,12 @@ void registry_persist(void);
 void registry_get_spiffs_info(size_t *total, size_t *used);
 
 // ── Data update ──────────────────────────────────────────────────────────────
+// `power_mode` is a single-char tag from the LoRa packet ('v'/'i'/'n'/'?').
+// `current_ma`/`power_mw` are 0 when TX is in voltage mode or absent (old TX).
 bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
                            float bat_v, uint32_t msg_id, int rssi, int snr,
-                           const char *fw_version);
+                           const char *fw_version,
+                           char power_mode, int32_t current_ma, int32_t power_mw);
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 int registry_count(void);

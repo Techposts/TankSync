@@ -532,6 +532,15 @@ static esp_err_t handle_api_data(httpd_req_t *req) {
         cJSON_AddNumberToObject(t, "battery_v", data.battery_voltage);
         cJSON_AddNumberToObject(t, "rssi", data.rssi);
         cJSON_AddStringToObject(t, "state", registry_state_str(data.state));
+        // Power telemetry (TX firmware v2.0.4+; '?' for older TX firmware)
+        const char *pmode_str = (data.power_mode == 'i') ? "ina219"
+                              : (data.power_mode == 'v') ? "voltage"
+                              : (data.power_mode == 'n') ? "none"
+                              : "unknown";
+        cJSON_AddStringToObject(t, "power_mode", pmode_str);
+        cJSON_AddNumberToObject(t, "current_ma", (double)data.current_ma);
+        cJSON_AddNumberToObject(t, "power_mw",   (double)data.power_mw);
+        cJSON_AddBoolToObject  (t, "charging",   data.charging);
         int64_t age_s = data.last_update_us > 0
             ? (esp_timer_get_time() - data.last_update_us) / 1000000LL : -1;
         cJSON_AddNumberToObject(t, "last_seen_s", (double)age_s);
@@ -664,6 +673,15 @@ static esp_err_t handle_get_transmitters(httpd_req_t *req) {
         cJSON_AddStringToObject(t, "fw_version", data.fw_version[0] ? data.fw_version : "unknown");
         cJSON_AddBoolToObject  (t, "ota_pending", ota_p);
         cJSON_AddNumberToObject(t, "ota_offset", ota_o);
+        // Power telemetry (TX firmware v2.0.4+; '?' for older TX firmware)
+        const char *pmode_str = (data.power_mode == 'i') ? "ina219"
+                              : (data.power_mode == 'v') ? "voltage"
+                              : (data.power_mode == 'n') ? "none"
+                              : "unknown";
+        cJSON_AddStringToObject(t, "power_mode", pmode_str);
+        cJSON_AddNumberToObject(t, "current_ma", (double)data.current_ma);
+        cJSON_AddNumberToObject(t, "power_mw",   (double)data.power_mw);
+        cJSON_AddBoolToObject  (t, "charging",   data.charging);
         cJSON_AddItemToArray(arr, t);
     }
     char *json = cJSON_PrintUnformatted(root); cJSON_Delete(root); send_json(req, json); free(json);

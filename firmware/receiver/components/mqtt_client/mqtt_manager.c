@@ -235,6 +235,28 @@ void mqtt_publish_tank(int idx) {
 
     make_topic(topic, sizeof(topic), slug, "state");
     pub(topic, registry_state_str(data.state), 1);
+
+    // Power telemetry (TX v2.0.4+) — published only when TX has reported a real mode.
+    // '?' (unknown / pre-v2.0.4 TX) is skipped to avoid polluting topics for old hardware.
+    if (data.power_mode == 'v' || data.power_mode == 'i' || data.power_mode == 'n') {
+        const char *pmode_str = (data.power_mode == 'i') ? "ina219"
+                              : (data.power_mode == 'v') ? "voltage"
+                              : "none";
+        make_topic(topic, sizeof(topic), slug, "power_mode");
+        pub(topic, pmode_str, 1);
+
+        snprintf(val, sizeof(val), "%ld", (long)data.current_ma);
+        make_topic(topic, sizeof(topic), slug, "current_ma");
+        pub(topic, val, 1);
+
+        snprintf(val, sizeof(val), "%ld", (long)data.power_mw);
+        make_topic(topic, sizeof(topic), slug, "power_mw");
+        pub(topic, val, 1);
+
+        // HA-style binary sensor convention: ON / OFF
+        make_topic(topic, sizeof(topic), slug, "charging");
+        pub(topic, data.charging ? "ON" : "OFF", 1);
+    }
 }
 
 void mqtt_publish_system(void) {

@@ -36,7 +36,7 @@
 #define WEB_MAX_SOCKETS 5
 #endif
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "2.1.0"
+#define FIRMWARE_VERSION "2.2.0"
 #endif
 #ifndef TANKSYNC_CLOUD_URL
 #define TANKSYNC_CLOUD_URL "https://your-tanksync-server.example.com"

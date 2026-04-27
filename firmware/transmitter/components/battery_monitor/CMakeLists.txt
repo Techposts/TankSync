@@ -3,6 +3,7 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES
         esp_adc
-        driver
+        driver        # i2c_master
+        nvs_flash     # power-mode override persistence
         freertos
 )

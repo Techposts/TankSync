@@ -292,7 +292,8 @@ bool registry_set_enabled(uint16_t addr, bool enabled) {
 
 bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
                            float bat_v, uint32_t msg_id, int rssi, int snr,
-                           const char *fw_version) {
+                           const char *fw_version,
+                           char power_mode, int32_t current_ma, int32_t power_mw) {
     LOCK();
     int idx = -1;
     for (int i = 0; i < s_count; i++) {
@@ -314,6 +315,11 @@ bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
     s_data[idx].packets_rx++;
     s_data[idx].data_valid      = true;
     s_data[idx].state           = TX_STATE_CONNECTED;
+    s_data[idx].power_mode      = (power_mode == 'v' || power_mode == 'i' ||
+                                   power_mode == 'n') ? power_mode : '?';
+    s_data[idx].current_ma      = current_ma;
+    s_data[idx].power_mw        = power_mw;
+    s_data[idx].charging        = (s_data[idx].power_mode == 'i' && current_ma < 0);
     bool ver_changed = false;
     if (fw_version && fw_version[0]) {
         if (strcmp(s_data[idx].fw_version, fw_version) != 0) {

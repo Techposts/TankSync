@@ -6,6 +6,7 @@
  */
 
 #include "wifi_ota.h"
+#include "battery_monitor.h"      /* power_mode_t + power_get_override / set */
 #include "driver/gpio.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
@@ -73,6 +74,7 @@ static const char PAGE_HTML[] =
 "<div class='row'>ADDRESS <span class='v' id='addr'>--</span></div>"
 "<div class='row'>SLEEP <span class='v' id='slp'>--</span>S</div>"
 "<div class='row'>SAMPLES <span class='v' id='smp'>--</span></div>"
+"<div class='row'>POWER <span class='v' id='pmd'>--</span></div>"
 "</div>"
 
 "<div class='card'>"
@@ -81,6 +83,14 @@ static const char PAGE_HTML[] =
 "<input type='number' id='sleep_s' min='60' max='86400' value='300'>"
 "<label>SENSOR SAMPLES</label>"
 "<input type='number' id='samples' min='3' max='20' value='5'>"
+"<label>POWER SENSOR</label>"
+"<select id='power_override' style='width:100%;padding:.5rem;background:#000;color:#0f0;border:1px solid #0f0;font-family:monospace'>"
+"<option value='auto'>AUTO-DETECT (RECOMMENDED)</option>"
+"<option value='ina219'>FORCE INA219 (I&sup2;C 0X40)</option>"
+"<option value='voltage'>FORCE VOLTAGE DIVIDER (ADC)</option>"
+"<option value='disabled'>DISABLED (NO POWER MONITORING)</option>"
+"</select>"
+"<div style='font-size:.7rem;opacity:.7;margin-top:.25rem'>CHANGE TAKES EFFECT ON NEXT BOOT</div>"
 "<button class='btn' onclick='saveSettings()'>SAVE</button>"
 "<div class='msg' id='cfg-status'></div>"
 "</div>"
@@ -110,17 +120,23 @@ static const char PAGE_HTML[] =
 "document.getElementById('smp').textContent=d.samples;"
 "document.getElementById('sleep_s').value=d.sleep_s;"
 "document.getElementById('samples').value=d.samples;"
+// Power sensor: shows the saved override (active value applies after reboot)
+"var po=d.power_override||'auto';"
+"var pmd=(po==='auto')?'AUTO-DETECT':('FORCED '+po.toUpperCase());"
+"document.getElementById('pmd').textContent=pmd;"
+"document.getElementById('power_override').value=po;"
 "});"
 
 // Save settings
 "function saveSettings(){"
 "var s=document.getElementById('sleep_s').value;"
 "var m=document.getElementById('samples').value;"
+"var po=document.getElementById('power_override').value;"
 "var st=document.getElementById('cfg-status');"
 "fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},"
-"body:JSON.stringify({sleep_s:parseInt(s),samples:parseInt(m)})}).then(r=>r.json()).then(d=>{"
+"body:JSON.stringify({sleep_s:parseInt(s),samples:parseInt(m),power_override:po})}).then(r=>r.json()).then(d=>{"
 "st.className='msg '+(d.ok?'msg-ok':'msg-err');"
-"st.textContent=d.ok?'SETTINGS SAVED':'ERROR: '+d.error;"
+"st.textContent=d.ok?'SETTINGS SAVED — POWER MODE APPLIES ON NEXT BOOT':'ERROR: '+d.error;"
 "document.getElementById('slp').textContent=s;"
 "document.getElementById('smp').textContent=m;"
 "}).catch(e=>{st.className='msg msg-err';st.textContent='Failed: '+e;});"
@@ -186,10 +202,16 @@ static esp_err_t handle_info(httpd_req_t *req) {
     const esp_app_desc_t *app = esp_app_get_description();
     if (app) strncpy(version, app->version, sizeof(version) - 1);
 
-    char json[256];
+    // Read persisted power-monitor override (default "auto")
+    char power_override[16] = "auto";
+    power_get_override(power_override, sizeof(power_override));
+
+    char json[320];
     snprintf(json, sizeof(json),
-        "{\"version\":\"%s\",\"address\":%d,\"sleep_s\":%lu,\"samples\":%d}",
-        version, (int)address, (unsigned long)sleep_s, (int)samples);
+        "{\"version\":\"%s\",\"address\":%d,\"sleep_s\":%lu,\"samples\":%d,"
+        "\"power_override\":\"%s\"}",
+        version, (int)address, (unsigned long)sleep_s, (int)samples,
+        power_override);
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, json, -1);
@@ -219,6 +241,24 @@ static esp_err_t handle_config(httpd_req_t *req) {
         if (p) samples = (uint8_t)atoi(p + 1);
     }
 
+    // Optional: power-monitor override (string field)
+    // Accepts "auto" / "voltage" / "ina219" / "disabled"; ignored if absent or unknown.
+    char power_override[16] = {0};
+    if ((p = strstr(buf, "\"power_override\"")) != NULL) {
+        char *q = strchr(p, ':');
+        if (q) {
+            char *start = strchr(q, '"');
+            if (start) {
+                start++;
+                char *end = strchr(start, '"');
+                if (end && (end - start) < (int)sizeof(power_override)) {
+                    memcpy(power_override, start, end - start);
+                    power_override[end - start] = '\0';
+                }
+            }
+        }
+    }
+
     // Clamp values
     if (sleep_s < 60)    sleep_s = 60;
     if (sleep_s > 86400) sleep_s = 86400;
@@ -236,7 +276,17 @@ static esp_err_t handle_config(httpd_req_t *req) {
     nvs_commit(h);
     nvs_close(h);
 
-    ESP_LOGI(TAG, "Config saved: sleep=%lus samples=%d", (unsigned long)sleep_s, (int)samples);
+    // Apply power-mode override (separate NVS namespace, validated by power_set_override)
+    if (power_override[0] != '\0') {
+        esp_err_t perr = power_set_override(power_override);
+        if (perr != ESP_OK) {
+            ESP_LOGW(TAG, "Ignoring invalid power_override='%s'", power_override);
+        }
+    }
+
+    ESP_LOGI(TAG, "Config saved: sleep=%lus samples=%d power_override=%s",
+             (unsigned long)sleep_s, (int)samples,
+             power_override[0] ? power_override : "(unchanged)");
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, "{\"ok\":true}", -1);

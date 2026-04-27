@@ -57,15 +57,29 @@ esp_err_t lora_tx_init(uart_port_t uart_num, int tx_pin, int rx_pin, int baud);
 /**
  * Send a tank reading to the receiver with retries.
  *
- * Payload: "TANK:<dist_cm>:<bat_pct>:<bat_v>:<msg_id>"
+ * Payload (since v2.0.4):
+ *   "TANK:<dist_cm>:<bat_pct>:<bat_v>:<msg_id>:<fw_version>:<pwr_mode>:<curr_ma>:<pow_mw>"
  *
- * @param dist_cm    Distance reading
- * @param bat_pct    Battery percentage
- * @param bat_v      Battery voltage
+ * Fields after <msg_id> are appended for forward-compatibility. Older RX
+ * firmware that only parses the first 4–5 fields will simply ignore the rest.
+ *
+ * pwr_mode is a single char tag:
+ *   'v' = voltage divider, 'i' = INA219, 'n' = disabled, '?' = unknown
+ * curr_ma is signed (positive = discharging, negative = charging); 0 in voltage mode.
+ * pow_mw  is V × I (computed); 0 in voltage mode.
+ *
+ * @param dist_cm    Distance reading in cm
+ * @param bat_pct    Battery percentage 0–100
+ * @param bat_v      Battery voltage in volts
+ * @param pwr_mode   Power-monitor mode tag (see above)
+ * @param current_ma Battery current in mA (signed)
+ * @param power_mw   Battery power in mW (signed)
  * @param msg_id     Unique message ID (use RTC memory counter)
  * @return true if ACK received, false if all retries failed
  */
-bool lora_tx_send(int dist_cm, int bat_pct, float bat_v, uint32_t msg_id);
+bool lora_tx_send(int dist_cm, int bat_pct, float bat_v,
+                  char pwr_mode, int32_t current_ma, int32_t power_mw,
+                  uint32_t msg_id);
 
 /** Save and apply new LoRa config. */
 esp_err_t lora_tx_set_config(const lora_tx_config_t *cfg);

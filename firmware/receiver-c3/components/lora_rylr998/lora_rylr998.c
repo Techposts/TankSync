@@ -250,6 +250,36 @@ static bool parse_rcv(const char *line, lora_rx_packet_t *pkt) {
     } else {
         pkt->fw_version[0] = '\0';
     }
+
+    // Optional 7th field: power-monitor mode tag (single char) — absent for TX <v2.0.4
+    // Optional 8th field: signed current_ma (decimal integer)
+    // Optional 9th field: signed power_mw  (decimal integer)
+    pkt->power_mode = '?';
+    pkt->current_ma = 0;
+    pkt->power_mw   = 0;
+    pkt->charging   = false;
+
+    char *mode_s = strtok_r(NULL, ":\r\n", &sp2);
+    if (mode_s && mode_s[0] != '\0') {
+        char m = mode_s[0];
+        if (m == 'v' || m == 'V' || m == 'i' || m == 'I' || m == 'n' || m == 'N') {
+            pkt->power_mode = (char)((m >= 'A' && m <= 'Z') ? (m + 32) : m);
+        }
+    }
+
+    char *curr_s = strtok_r(NULL, ":\r\n", &sp2);
+    if (curr_s) {
+        pkt->current_ma = (int32_t)strtol(curr_s, NULL, 10);
+    }
+
+    char *pow_s = strtok_r(NULL, ":\r\n", &sp2);
+    if (pow_s) {
+        pkt->power_mw = (int32_t)strtol(pow_s, NULL, 10);
+    }
+
+    // Charging is true only if INA219 mode AND current is negative (current flowing into battery).
+    pkt->charging = (pkt->power_mode == 'i' && pkt->current_ma < 0);
+
     return true;
 }
 

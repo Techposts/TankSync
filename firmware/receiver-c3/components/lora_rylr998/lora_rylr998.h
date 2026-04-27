@@ -44,6 +44,14 @@ typedef struct {
     int      snr;               // Signal-to-noise ratio (dB)
     bool     data_valid;        // true if TANK packet parsed successfully
     char     fw_version[16];    // transmitter firmware version (empty if old TX)
+
+    // Power telemetry (since TX firmware v2.0.4) — present only if the TX
+    // packet includes the optional fields appended after fw_version.
+    // Old TX firmware that omits these → power_mode='?' and *_ma/*_mw=0.
+    char     power_mode;        // 'v'=voltage divider, 'i'=INA219, 'n'=disabled, '?'=unknown/old
+    int32_t  current_ma;        // signed; +ve discharge, -ve charge; 0 in voltage mode
+    int32_t  power_mw;          // V × I; 0 in voltage mode
+    bool     charging;          // explicit flag derived from current sign / unknown for old TX
 } lora_rx_packet_t;
 
 // ── Hardware state ────────────────────────────────────────────────────────────

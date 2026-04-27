@@ -188,12 +188,20 @@ esp_err_t lora_tx_init(uart_port_t uart_num, int tx_pin, int rx_pin, int baud) {
     return ESP_OK;
 }
 
-bool lora_tx_send(int dist_cm, int bat_pct, float bat_v, uint32_t msg_id) {
-    char payload[64];
-    snprintf(payload, sizeof(payload), "TANK:%d:%d:%.2f:%" PRIu32 ":%s",
-             dist_cm, bat_pct, bat_v, msg_id, s_fw_version[0] ? s_fw_version : "?");
+bool lora_tx_send(int dist_cm, int bat_pct, float bat_v,
+                  char pwr_mode, int32_t current_ma, int32_t power_mw,
+                  uint32_t msg_id) {
+    // Validate pwr_mode tag — fall back to '?' if caller passed a bogus char.
+    if (pwr_mode != 'v' && pwr_mode != 'i' && pwr_mode != 'n') pwr_mode = '?';
 
-    char cmd[120];
+    char payload[112];
+    snprintf(payload, sizeof(payload),
+             "TANK:%d:%d:%.2f:%" PRIu32 ":%s:%c:%ld:%ld",
+             dist_cm, bat_pct, bat_v, msg_id,
+             s_fw_version[0] ? s_fw_version : "?",
+             pwr_mode, (long)current_ma, (long)power_mw);
+
+    char cmd[176];
     int  plen = strlen(payload);
     snprintf(cmd, sizeof(cmd), "AT+SEND=%d,%d,%s",
              s_cfg.receiver_address, plen, payload);

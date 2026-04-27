@@ -23,7 +23,7 @@
 
 // OTA configuration defaults
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION        "2.1.0"
+#define FIRMWARE_VERSION        "2.2.0"
 #endif
 #ifndef OTA_GITHUB_OWNER
 #define OTA_GITHUB_OWNER        "Techposts"
@@ -53,7 +53,7 @@ typedef enum {
 
 typedef struct {
     ota_status_t status;
-    char latest_version[32];    // e.g. "2.1.0" (from GitHub tag, strip "v" prefix)
+    char latest_version[32];    // e.g. "2.2.0" (from GitHub tag, strip "v" prefix)
     char download_url[256];
     int  progress_pct;          // 0-100 during download
     char error_msg[128];

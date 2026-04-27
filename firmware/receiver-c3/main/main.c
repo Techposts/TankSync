@@ -94,7 +94,8 @@ static void on_lora_rx(const lora_rx_packet_t *pkt) {
         pkt->src_addr, pkt->raw_dist_cm,
         pkt->battery_pct, pkt->battery_voltage,
         pkt->msg_id, pkt->rssi, pkt->snr,
-        pkt->fw_version);
+        pkt->fw_version,
+        pkt->power_mode, pkt->current_ma, pkt->power_mw);
 
     if (updated) {
         xEventGroupSetBits(s_events, EVT_NEW_LORA_DATA);
