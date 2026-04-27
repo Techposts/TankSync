@@ -11,23 +11,16 @@ Authoritative wiring reference for the TankSync receiver (RX) and transmitter (T
 
 The TX is the energy-constrained device. The RX is intentionally indoor-and-plugged so its power budget (display + WiFi + LoRa-listen + LEDs) doesn't have to fit a small solar harvest.
 
-### Whole-system flow
+### Whole-system flow (5 boxes)
 
 ```mermaid
 flowchart LR
-    PANEL["Solar panel<br/>6V / 180mA"] --> MPPT["CN3791<br/>MPPT charger"]
-    MPPT --> BAT["18650 Li-ion<br/>3.0–4.2V"]
-    BAT --> BOOST["MT3608 boost<br/>3.7V → 5V"]
-    BOOST --> TX["TX board<br/>(ESP32-C3 SuperMini)"]
-    TX -- "AJ-SR04M ultrasonic" --> SONAR["Tank water level"]
-    TX -. "LoRa 865 MHz<br/>up to 5 km" .-> RX["RX board<br/>(ESP32 DevKit or C3)"]
-    USB["5V USB brick"] --> RX
-    RX --> OLED["SH1106 OLED<br/>display"]
-    RX --> LEDS["WS2812B<br/>status + water level"]
-    RX -- "WiFi STA" --> WIFI(("Home<br/>WiFi"))
-    RX -. "MQTT (HA)" .-> HA["Home Assistant<br/>or any MQTT broker"]
-    RX -. "HTTPS REST" .-> CLOUD(("TankSync<br/>Cloud (optional)"))
+    TX[TX board<br/>by tank] -.->|LoRa 865 MHz| RX[RX board<br/>indoors]
+    RX -->|WiFi| BROKER[MQTT broker<br/>HA or TankSync cloud]
+    BROKER --> APP[Dashboard<br/>HA or PWA]
 ```
+
+All modules share a common ground. Detailed power chain, sensor connections, and per-board pin maps are below.
 
 ---
 
@@ -39,35 +32,25 @@ There are **two RX hardware variants** depending on the ESP32 chip on hand:
 
 Both variants use the **same external modules** (RYLR998 LoRa, SH1106 OLED, WS2812B LEDs). Only the GPIO assignments differ. Power comes from a 5V USB-C wall brick into the dev-board's USB connector; the on-board AMS1117-3.3 LDO derives the 3.3V rail used by RYLR998.
 
-### RX circuit diagram
+### RX power flow (3 boxes)
 
 ```mermaid
-flowchart TB
-    USB[5V USB-C wall brick<br/>≥1.5A]
-    ESP[ESP32 board<br/>DevKit v1 OR<br/>C3 SuperMini]
-    LDO[On-board AMS1117-3.3<br/>5V → 3.3V LDO]
-    LORA[RYLR998 LoRa module<br/>UART @ 115200<br/>VCC = 3.3V]
-    OLED[SH1106 OLED<br/>128×64 I²C 0x3C<br/>3.3V or 5V tolerant]
-    LEDS[WS2812B × 2<br/>status + water-level<br/>VDD = 5V]
-    GND((Common GND))
-
-    USB -->|5V VBUS| ESP
-    ESP -->|5V rail| LEDS
-    ESP -->|5V rail| OLED
-    ESP -->|on-board LDO| LDO
-    LDO -->|3.3V| LORA
-    LDO -->|3.3V| OLED
-
-    ESP <-->|UART TX/RX| LORA
-    ESP -->|GPIO data| LEDS
-    ESP <-->|I²C SDA/SCL| OLED
-
-    USB -.-> GND
-    ESP -.-> GND
-    LORA -.-> GND
-    OLED -.-> GND
-    LEDS -.-> GND
+flowchart LR
+    USB[5V USB-C brick] --> ESP[ESP32 board]
+    ESP -->|5V rail| L1[WS2812B + OLED]
+    ESP -->|on-board LDO 3.3V| L2[RYLR998 LoRa]
 ```
+
+### RX peripheral connections (3 boxes)
+
+```mermaid
+flowchart LR
+    ESP[ESP32 board] <-->|UART| LORA[RYLR998 LoRa]
+    ESP <-->|I²C| OLED[SH1106 OLED]
+    ESP -->|GPIO data| LEDS[WS2812B × 2]
+```
+
+All modules share a common ground.
 
 ### RX block diagram (alt-text view)
 
@@ -176,55 +159,37 @@ The TX is `firmware/transmitter/` (ESP32-C3 SuperMini). The board ships in two v
 
 The firmware **auto-detects** which variant is installed by I²C-scanning at INA219's default address (`0x40`) at boot. Users can also force a mode via the web UI dropdown (Auto / Force INA219 / Force voltage divider / Disabled). The mode is saved to NVS.
 
-### TX circuit diagram
+### TX power chain — common to both variants (5 boxes)
 
 ```mermaid
-flowchart TB
-    PANEL[Solar panel<br/>6V / 180mA crystalline]
-    MPPT[CN3791 MPPT<br/>Solar charger<br/>tracks Vmpp ≈ 4.5V]
-    BAT[18650 Li-ion<br/>3.0–4.2V<br/>protected]
-    VDIV{{"Variant A:<br/>100k / 100k divider<br/>→ GPIO0 ADC"}}
-    INA[INA219 module<br/>0.1Ω shunt<br/>I²C 0x40]
-    BOOST[MT3608 boost<br/>3.7V → 5.0V]
-    ESP[ESP32-C3 SuperMini<br/>VBUS = 5V]
-    LDO[on-board AMS1117<br/>3.3V LDO]
-    LORA[RYLR998 LoRa<br/>VCC = 3.3V]
-    SONAR[AJ-SR04M ultrasonic<br/>VCC = 5V]
-    LEDS[WS2812B × 2<br/>VDD = 5V]
-    BTN[Tactile button<br/>BOOT/PAIR/OTA]
-    GND((Common GND))
-
-    PANEL -->|Vin+/Vin-| MPPT
-    MPPT -->|BAT+/BAT-| BAT
-    BAT -. "Variant A wiring" .-> VDIV
-    BAT -. "Variant B wiring" .-> INA
-    INA -->|battery+ pass-through| BOOST
-    VDIV -. "(no shunt — direct)" .-> BOOST
-    BAT -->|3.7V nominal| BOOST
-    BOOST -->|+5V rail| ESP
-    BOOST -->|+5V| SONAR
-    BOOST -->|+5V| LEDS
-    ESP --> LDO
-    LDO -->|3.3V| LORA
-    LDO -. "(if Variant B)" .-> INA
-
-    ESP <-->|UART TX/RX| LORA
-    ESP <-->|TRIG/ECHO| SONAR
-    ESP -->|GPIO data| LEDS
-    ESP <-->|I²C SDA/SCL<br/>Variant B only| INA
-    ESP <-->|GPIO9 active-low| BTN
-
-    PANEL -.-> GND
-    MPPT -.-> GND
-    BAT -.-> GND
-    BOOST -.-> GND
-    ESP -.-> GND
-    LORA -.-> GND
-    SONAR -.-> GND
-    LEDS -.-> GND
-    INA -.-> GND
-    BTN -.-> GND
+flowchart LR
+    PANEL[Solar panel<br/>6V / 180mA] --> MPPT[CN3791<br/>MPPT charger]
+    MPPT --> BAT[18650 Li-ion<br/>protected]
+    BAT --> BOOST[MT3608 boost<br/>3.7V → 5V]
+    BOOST --> RAIL[+5V rail to<br/>ESP32-C3, sonar, LEDs]
 ```
+
+### TX peripheral connections (5 boxes)
+
+```mermaid
+flowchart LR
+    ESP[ESP32-C3 SuperMini] <-->|UART| LORA[RYLR998 LoRa]
+    ESP <-->|TRIG/ECHO| SONAR[AJ-SR04M sonar]
+    ESP -->|GPIO data| LEDS[WS2812B × 2]
+    ESP <-->|GPIO9| BTN[Tactile button]
+```
+
+### TX power-monitor variants (where Variant A and B differ)
+
+```mermaid
+flowchart LR
+    BAT[18650 battery+] -- Variant A --> DIV[100k/100k divider<br/>→ GPIO0 ADC]
+    BAT -- Variant B --> INA[INA219 shunt<br/>I²C 0x40 SDA/SCL = GPIO1/2]
+    DIV --> COMMON[battery+ continues to<br/>CN3791 BAT and MT3608 in]
+    INA --> COMMON
+```
+
+All modules share a common ground. Variant A and Variant B run the **same firmware binary** — the firmware boot-probes I²C `0x40` to pick the active mode.
 
 ### TX power chain (alt-text view)
 
