@@ -1,16 +1,25 @@
 Component,Quantity (TX),Quantity (RX),Description,Approx Price (USD),Notes
-ESP32-C3 SuperMini,1,1,Main microcontroller with WiFi/BLE,$3.00,AliExpress/Amazon
+ESP32-C3 SuperMini,1,1,Main microcontroller with WiFi/BLE,$3.00,AliExpress/Amazon. RX can also use ESP32 DevKit v1.
 RYLR998,1,1,LoRa module 868/915MHz,$10.00,Reyax official or AliExpress
-JSN-SR04T,1,0,Waterproof ultrasonic sensor,$5.00,20cm-450cm range
-WS2812B LED Strip,2 LEDs,3 LEDs,Addressable RGB LEDs,$1.00,Cut from strip
-100K Resistor,2,0,1/4W for voltage divider,$0.10,Any standard resistor
-3.7V Li-ion Battery,1,0,18650 or similar 1000mAh+,$5.00,Protected cell recommended
-TP4056 Module,1,0,Battery charging module,$0.50,Optional for charging
-USB Cable,0,1,Micro USB or USB-C for power,$2.00,Depends on ESP32 variant
-Waterproof Enclosure,1,0,IP65 or better,$5.00,For outdoor installation
+SH1106 OLED 1.3" 128x64,0,1,Display for RX,$3.00,I2C 0x3C
+JSN-SR04T / AJ-SR04M,1,0,Waterproof ultrasonic sensor,$5.00,20cm-450cm range
+WS2812B LED,2,2,Addressable RGB LEDs,$0.50,Cut from strip
+Tactile push button,1,0,Boot/config/pair button on TX,$0.20,Through-hole 6mm
+Solar panel 6V 180mA,1,0,Polycrystalline ~250x80mm,$1.80,For TX outdoor solar
+CN3791 MPPT Solar Charger,1,0,Buck-MPPT solar to Li-ion charger,$1.45,Replaces TP4056 for solar use; tracks Vmpp
+18650 Li-ion 3000mAh + protected holder,1,0,Single-cell with protection PCB,$2.40,Protection mandatory (CN3791 has no over-discharge cutoff)
+MT3608 DC-DC Boost 3.7V to 5V,1,0,Step-up converter for 5V loads,$0.60,EN pin to GPIO10 recommended for low-power
+100K Resistor 1%,2,0,Variant A only — voltage divider,$0.10,Skip if Variant B (INA219)
+INA219 Module 0.1Ohm shunt,1,0,Variant B only — power monitor over I2C,$1.45,Default I2C addr 0x40
+4.7K Resistor (I2C pull-ups),2,0,Variant B only,$0.10,Often included on INA219 module already
+USB Cable,0,1,USB-C for RX 5V wall power,$2.00,RX is wall-powered indoors
+USB-C 5V wall brick (>= 1.5A),0,1,Wall adapter for RX,$3.00,Standard phone charger works
+Waterproof Enclosure,1,0,IP65 or better,$5.00,For outdoor TX installation
 Jumper Wires,As needed,As needed,For connections,$2.00,22-26 AWG
 Pin Headers,As needed,As needed,2.54mm pitch,$1.00,Optional for modularity
-,,,,,"
-TOTAL TRANSMITTER,,,,$27.00 - $35.00,
-TOTAL RECEIVER,,,,$15.00 - $20.00,
-COMPLETE SYSTEM,,,,$42.00 - $55.00,
+,,,,,
+TOTAL TRANSMITTER (Variant A - voltage divider),,,,$28.00 - $36.00,Adds solar harvest + voltage-only SoC
+TOTAL TRANSMITTER (Variant B - INA219),,,,$30.00 - $38.00,Adds full charge/discharge/power telemetry
+TOTAL RECEIVER,,,,$18.00 - $25.00,Wall-powered indoor unit
+COMPLETE SYSTEM (TX-A + RX),,,,$46.00 - $61.00,Entry SKU
+COMPLETE SYSTEM (TX-B + RX),,,,$48.00 - $63.00,Premium SKU with power telemetry

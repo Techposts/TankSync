@@ -58,13 +58,19 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 | Receiver MCU | ESP32 DevKit v1 (or ESP32-C3 SuperMini) | $4-8 |
 | Transmitter MCU | ESP32-C3 SuperMini | $3 |
 | LoRa Module | REYAX RYLR998 (x2) | $8 each |
-| Ultrasonic Sensor | JSN-SR04T (waterproof) | $4 |
+| Ultrasonic Sensor | JSN-SR04T / AJ-SR04M (waterproof) | $4 |
 | Display | SH1106 1.3" OLED I2C | $3 |
-| Battery | 18650 LiPo + TP4056 charger | $3 |
+| Battery | 18650 LiPo + protected holder | $2.40 |
+| Solar charger | CN3791 MPPT (replaces TP4056 for solar TX) | $1.45 |
+| Boost converter | MT3608 3.7V → 5V | $0.60 |
+| Power monitor (optional) | INA219 over I2C | $1.45 |
 
-**Total: ~$35-40 per setup**
+**Total: ~$46-63 per complete system** (entry vs premium SKU)
 
-Full bill of materials: [hardware/BOM.csv](hardware/BOM.csv)
+📐 **[Detailed wiring diagrams, pin connections, and power chain →](hardware/wiring.md)**
+Includes block diagrams for both DevKit-RX and C3-RX, full TX power chain with solar charging, and both power-monitoring variants (voltage divider vs INA219 over I2C with auto-detect).
+
+📋 **[Full BOM →](hardware/BOM.csv)**
 
 ## Quick Start
 
