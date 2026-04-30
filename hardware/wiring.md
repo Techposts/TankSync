@@ -24,6 +24,39 @@ All modules share a common ground. Detailed power chain, sensor connections, and
 
 ---
 
+## Sensor naming note (TX)
+
+The firmware refers to the ultrasonic distance sensor as **AJ-SR04M**. Same module is also sold as **JSN-SR04M-2**, **HC-SR04M-WP**, and **RCWL-9620** — functionally identical (5V TRIG/ECHO protocol, waterproof transducer on a cable). Any of these will work; the cloud BOM uses AJ-SR04M part numbers because that's what the Robu/Indian distributors carry. **ECHO is a 5V output** and must be level-shifted to 3.3V before reaching the C3's GPIO5 (1kΩ series + 2kΩ to GND on PCB; on breadboard you can get away without it short-term but a production PCB MUST include the divider).
+
+---
+
+## User-interaction model (both boards)
+
+For PCB design, both boards expose two physical user buttons + one status LED. The exact firmware behaviours below are what the firmware roadmap targets; the **physical wiring** is what the PCB needs to support today regardless of when each firmware behaviour ships.
+
+| Board | Button A (BOOT/long-press) | Button B (RESET) | Status LED |
+|---|---|---|---|
+| **TX** | GPIO9 onboard BOOT (hold 2s = pair, hold 5s = AP mode for OTA) | EN pin (hardware reset) | GPIO8 onboard single LED (visual feedback during pair / AP / OTA states) |
+| **RX** | GPIO0 onboard BOOT (hold 2s = pair, hold 5s = AP mode for OTA) | EN pin (hardware reset) | WS2812 chain on GPIO13 (firmware-configurable count: 2 / 8 / 24) |
+
+**Important strapping-pin caveats** (both boards):
+- GPIO0 (RX BOOT) and GPIO9 (TX BOOT) are *strapping pins* — they must read HIGH at reset for the chip to enter normal flash boot. The momentary tactile button (only pulls LOW when pressed) is fine; the dev-board's onboard 10kΩ pull-up + your external panel button in parallel both default to HIGH. Do NOT add anything that holds these pins LOW persistently.
+- TX GPIO8 (onboard LED) is also a strapping pin (must be HIGH at boot for normal flash mode). The C3 SuperMini's onboard LED has a series resistor and the line is high-Z when not driven, so boot is normally fine. If you ever see the chip refusing to boot on a custom PCB layout, add an external 10kΩ pull-up from GPIO8 to 3V3.
+
+**Firmware-state-to-LED-colour mapping (TX status LED on GPIO8 — planned)**:
+
+| Firmware state | LED behaviour |
+|---|---|
+| Normal sleep/wake cycle | Off (deep-sleep saves power) |
+| Pairing mode (after 2s hold) | Slow blink, ~1Hz |
+| AP mode for OTA (after 5s hold) | Fast blink, ~3Hz |
+| OTA flash in progress | Solid on |
+| Pairing successful | 3 quick flashes, then off |
+
+The same state machine on RX uses the WS2812 chain instead of a single LED — colours map to states with the broader palette (rain blue = pairing, leaf green = paired, warm = AP, rust = error).
+
+---
+
 ## Receiver (RX) wiring
 
 There are **two RX hardware variants** depending on the ESP32 chip on hand:
@@ -32,22 +65,31 @@ There are **two RX hardware variants** depending on the ESP32 chip on hand:
 
 Both variants use the **same external modules** (RYLR998 LoRa, SH1106 OLED, WS2812B LEDs). Only the GPIO assignments differ. Power comes from a 5V USB-C wall brick into the dev-board's USB connector; the on-board AMS1117-3.3 LDO derives the 3.3V rail used by RYLR998.
 
-### RX power flow (3 boxes)
+### RX power flow (4 boxes)
 
 ```mermaid
 flowchart LR
-    USB[5V USB-C brick] --> ESP[ESP32 board]
-    ESP -->|5V rail| L1[WS2812B + OLED]
-    ESP -->|on-board LDO 3.3V| L2[RYLR998 LoRa]
+    USB[5V USB-C brick<br/>≥2A for 24-ring] --> ESP[ESP32 DevKit<br/>onboard AMS1117 → 3V3]
+    USB -->|+5V| LEDS[WS2812B chain<br/>2/8/24 LEDs]
+    ESP -->|3V3| OLED[SH1106 OLED]
+    ESP -->|3V3| LORA[RYLR998 LoRa]
 ```
 
-### RX peripheral connections (3 boxes)
+WS2812 chain takes its **VCC from USB 5V directly**, NOT from the DevKit's 3V3 LDO. A 24-LED ring at full white draws ~1.4A — far beyond the AMS1117's ~600mA budget. Pulling LED current from the 5V rail keeps the MCU power clean. Add a **1000µF electrolytic capacitor across the LED chain's VCC↔GND at the input** to absorb inrush when the strip lights up — important for the 24-ring, recommended for the 8-strip.
+
+### RX peripheral connections (5 boxes — split for clarity)
 
 ```mermaid
 flowchart LR
-    ESP[ESP32 board] <-->|UART| LORA[RYLR998 LoRa]
-    ESP <-->|I²C| OLED[SH1106 OLED]
-    ESP -->|GPIO data| LEDS[WS2812B × 2]
+    ESP[ESP32 DevKit] <-->|UART2<br/>GPIO16/17| LORA[RYLR998 LoRa]
+    ESP <-->|I²C 0x3C<br/>GPIO21/22| OLED[SH1106 OLED]
+    ESP -->|GPIO13<br/>+ 470Ω in line| LEDS[WS2812B chain]
+```
+
+```mermaid
+flowchart LR
+    BOOT[BOOT button<br/>onboard + external] -->|GPIO0 active LOW| ESP[ESP32 DevKit]
+    RST[RESET button<br/>onboard + external] -->|EN pin| ESP
 ```
 
 All modules share a common ground.
@@ -75,17 +117,19 @@ All modules share a common ground.
 
 ### Pin map — DevKit ESP32 RX
 
-Source: `firmware/receiver/main/config.h`
+Source of truth: `cloud/firmware/Receiver-ESP32-DevKit/main/config.h` (the public-tree `firmware/receiver/main/config.h` mirrors this for the open-core build). If they ever disagree, **cloud config.h wins**.
 
 | GPIO | Function | Connects to | Notes |
 |---|---|---|---|
-| 13 | WS2812B data | DIN of first LED in 2-LED chain | 3.3V data may need 74AHCT125 buffer if flicker observed |
+| 0 | BOOT button (planned) | Onboard tactile + external panel button → GND | Strapping pin; momentary press only. Firmware reads after boot for hold-2s/hold-5s pattern (planned). |
+| 13 | WS2812B data | DIN of first LED in chain (2/8/24-config) | 3.3V data line; add 470Ω in series to dampen reflections. 74AHCT125 level shifter only if flicker observed. |
 | 16 | UART2 RX | RYLR998 TXD | DevKit has UART2 free; C3 doesn't |
 | 17 | UART2 TX | RYLR998 RXD | |
 | 21 | I²C SDA | SH1106 SDA | Standard I²C bus |
 | 22 | I²C SCL | SH1106 SCL | |
-| 5V | Power | WS2812B VDD, OLED VCC (5V variant) | From USB |
-| 3.3V | Power | RYLR998 VCC, OLED VCC (3.3V variant) | From on-board LDO |
+| EN | RESET button | Onboard tactile + external panel button → GND | Hardware reset; pulled HIGH by board |
+| 5V | Power | WS2812B VDD (direct from USB, NOT through 3V3 LDO) | 24-ring needs 2A wall brick |
+| 3.3V | Power | RYLR998 VCC, SH1106 OLED VCC | From on-board LDO |
 | GND | Ground | All modules | Single common ground |
 
 #### Wire-by-wire — DevKit ESP32 RX
@@ -93,23 +137,33 @@ Source: `firmware/receiver/main/config.h`
 Every wire you actually solder/breadboard, in order:
 
 ```
-ESP32 DevKit GPIO13       →  WS2812B #1 DIN
-ESP32 DevKit 5V (VIN/USB) →  WS2812B #1 VDD
-ESP32 DevKit GND          →  WS2812B #1 GND
-WS2812B #1 DOUT           →  WS2812B #2 DIN  (chain)
-WS2812B #1 VDD            →  WS2812B #2 VDD
-WS2812B #1 GND            →  WS2812B #2 GND
+# POWER
+USB-C brick 5V         →  ESP32 DevKit VIN (or 5V pin)
+USB-C brick 5V         →  WS2812B chain VDD  (direct, NOT through DevKit 3V3)
+ESP32 DevKit 3V3       →  RYLR998 VCC
+ESP32 DevKit 3V3       →  SH1106 OLED VCC  (most modules accept 3V3 or 5V)
+1000µF cap             →  across WS2812 chain VCC↔GND at input  (inrush absorber)
 
+# WS2812 LED CHAIN (firmware config: 2 / 8 / 24 LEDs)
+ESP32 DevKit GPIO13    →  470Ω resistor → WS2812 #1 DIN
+WS2812 #1 DOUT         →  WS2812 #2 DIN
+WS2812 #2 DOUT         →  WS2812 #3 DIN  ... (chain continues for 8-strip or 24-ring)
+
+# LORA UART (UART2)
 ESP32 DevKit GPIO16 (RX2) →  RYLR998 TXD
 ESP32 DevKit GPIO17 (TX2) →  RYLR998 RXD
-ESP32 DevKit 3.3V         →  RYLR998 VCC
-ESP32 DevKit GND          →  RYLR998 GND
-                             RYLR998 RST  (leave floating, or pull-up to 3.3V)
+                             RYLR998 RST  (leave floating, or pull-up to 3V3 via 10kΩ)
 
-ESP32 DevKit GPIO21       →  SH1106 OLED SDA
-ESP32 DevKit GPIO22       →  SH1106 OLED SCL
-ESP32 DevKit 3.3V or 5V   →  SH1106 OLED VCC  (most modules accept either)
-ESP32 DevKit GND          →  SH1106 OLED GND
+# I²C BUS (OLED display)
+ESP32 DevKit GPIO21    →  SH1106 OLED SDA
+ESP32 DevKit GPIO22    →  SH1106 OLED SCL
+                          (most OLED modules have onboard 4.7kΩ pull-ups; if not, add to 3V3)
+
+# USER INTERACTION (PCB-ready; firmware support pending)
+External panel button  →  ESP32 DevKit GPIO0 (parallel with onboard BOOT button) → GND
+External panel button  →  ESP32 DevKit EN pin (parallel with onboard RST button) → GND
+
+# COMMON GROUND — all module GNDs land on one net
 ```
 
 ### Pin map — ESP32-C3 SuperMini RX
@@ -387,6 +441,19 @@ The INA219 is wired with its shunt resistor **in series with the battery's posit
 
 Bus voltage register reads the V- side relative to GND, which is the battery voltage (post-shunt; the shunt drop is millivolts and negligible for SoC display).
 
+### PCB-specific notes (required for board layout, optional on breadboard)
+
+These are issues that **breadboard prototyping forgives but a production PCB does not**. Capture them in the schematic before ordering boards.
+
+1. **ECHO line voltage divider — MANDATORY on PCB.** AJ-SR04M's ECHO output is 5V; ESP32-C3 GPIO inputs are 3.3V tolerant only (max VDD+0.3V = 3.6V absolute). Sustained 5V on GPIO5 stresses the I/O over weeks. Add **1kΩ in series + 2kΩ to GND** between AJ-SR04M ECHO and C3 GPIO5 (drops 5V → ~3.3V). On breadboard you might get away without it for hours of testing; on a PCB it's not optional.
+2. **TRIG line is fine at 3.3V.** The C3's GPIO4 outputs 3.3V, the AJ-SR04M's TRIG input accepts >2.4V as logic HIGH. No level shifting needed for the outbound direction.
+3. **INA219 module pull-ups (Variant B).** Most pre-built INA219 modules (Adafruit, Robu, generic AliExpress) include 4.7kΩ I²C pull-ups onboard. If you're populating a discrete INA219 chip directly on the TX PCB (no module), you MUST add pull-ups manually: 4.7kΩ from SDA→3V3 and SCL→3V3.
+4. **Decoupling on every IC.** 100nF ceramic between VCC↔GND placed within 5mm of each IC's power pin: ESP32-C3, INA219, RYLR998. PCB layout discipline.
+5. **Antenna keep-out for RYLR998.** The RYLR998's antenna trace needs **>5mm clear of any copper pour, ground plane, or metal component**. Document as a layer note in KiCad/EasyEDA. Same applies to the C3 SuperMini's onboard PCB antenna — the C3 module should sit at the *edge* of the board with its antenna end facing outward.
+6. **18650 reverse-polarity protection.** Add a Schottky diode (e.g. SS34) inline with the battery+ lead before CN3791 BAT+. Cheap insurance against a battery inserted backwards.
+7. **Status LED choice on GPIO8.** Firmware controls the C3 SuperMini's onboard built-in LED on GPIO8. On a custom PCB, you have two options: (a) keep the C3 module's onboard LED visible through the enclosure, or (b) add a discrete LED with a 330Ω current-limit resistor from GPIO8 to a panel-mounted indicator. Option (b) gives a brighter, larger indicator.
+8. **Optional WS2812 chain on GPIO7.** The 2-LED WS2812 chain on GPIO7 is firmware-supported but **optional** on a TX PCB if the onboard LED on GPIO8 is enough visual feedback. Drop GPIO7 + the WS2812 components from the BOM if you want a simpler/cheaper TX board; firmware will handle the missing chain gracefully.
+
 ### Sensor auto-detect & manual override
 
 Firmware behavior at boot:
@@ -425,8 +492,16 @@ For the canonical full BOM see `BOM.csv` in this directory. New entries added 20
 | GPIO | Reserved for | Why |
 |---|---|---|
 | GPIO3 | CN3791 STAT pin (charging-LED output) | Direct read of charger state without inferring from current sign |
-| GPIO6 | Future PIR / motion sensor | Wake-on-motion to extend battery on long deep-sleep |
+| GPIO6 | Future PIR / motion sensor or tank temperature sensor | Wake-on-motion to extend battery; or 1-Wire DS18B20 for water-temperature telemetry (see `project_tx_temp_sensor_planned.md` in agent memory) |
 | GPIO10 | MT3608 boost EN pin | Disable boost in deep-sleep to recover ~120 mAh/day quiescent loss |
+
+## Future expansion — RX
+
+| GPIO | Reserved for | Why |
+|---|---|---|
+| GPIO34–39 | Input-only sensors (light, temperature, humidity for room-context insights) | Hub-side environmental sensing — e.g. ambient light to dim OLED at night automatically |
+| GPIO25, 26 | DAC outputs for piezo buzzer | Audible alert when tank reaches critical low (separate from push notification) |
+| GPIO32, 33 | Additional panel buttons if firmware grows beyond pair/AP-mode | E.g. "Identify Hub" (flash LEDs to confirm physical unit), "Force MQTT reconnect" |
 
 ---
 
