@@ -48,6 +48,14 @@ No transmitter is paired yet. Go to the receiver's web UI and press "Start Pairi
 - The receiver listens for 60 seconds. Make sure to hold the transmitter's BOOT button for 2 seconds and release within that window.
 - On rx-v2.7.11+ the PWA shows a "Linking to your account..." spinner while the cloud saves the new tank, followed by "🎉 Paired!" with the tank's name. If you see "no transmitter responded" instead, the receiver heard nothing — check that the receiver and transmitter are within range and that the receiver isn't already paired with the same physical sensor.
 
+### I have multiple hubs at the same location — will they interfere?
+No. Three layers of isolation protect each hub:
+1. **NETID** — each hub generates a random LoRa Network ID (1-200) on its first ever pair, then keeps it forever. The RYLR998 radios filter by NETID at the *radio* level, so Hub A's TXs literally never reach Hub B's MCU.
+2. **Pair-mode is single-hub at a time** — when you tap "Pair a Tank" in the PWA with multiple hubs, the wizard asks which hub to pair to. Only that one hub listens for the new transmitter.
+3. **Cloud topic scoping** — each hub has its own MAC-derived device ID, so MQTT topics and cloud-DB tank lists are partitioned per hub. Tanks under Hub A never appear under Hub B.
+
+You can see each hub's NETID + frequency in PWA Settings → expand the hub row. If two hubs ever ended up on the same NETID (~0.5% chance per pair of fresh hubs), factory-reset one — its first pair will pick a different value.
+
 ### I need to start over completely (resale, lab swap, troubleshooting)
 - Web UI → System tab → **Factory Reset** button. Type `ERASE` to confirm.
 - This wipes Wi-Fi credentials, MQTT credentials, all paired tanks, the tombstone archive, history, and LoRa NETID.
