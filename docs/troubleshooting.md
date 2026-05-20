@@ -25,9 +25,33 @@ No transmitter is paired yet. Go to the receiver's web UI and press "Start Pairi
 ## Transmitter
 
 ### Transmitter won't pair
-- Ensure transmitter and receiver are using the same LoRa frequency and network ID
+- Ensure transmitter and receiver are using the same LoRa frequency
 - Transmitter must be powered on within 60 seconds of pressing "Start Pairing" on the receiver
 - Try power cycling the transmitter
+- On rx-v2.7.10+, both sides rendezvous on the well-known pair NETID (6) automatically during the pair window — you do NOT need to set NETID manually. If a TX from an even older firmware still won't pair, flash it with `tx-v2.0.11` or later.
+
+### "Tank disappeared" / one tank stopped reporting after pairing a second one
+- This was a known issue on rx-v2.7.9 and earlier — pairing a second TX rotated the receiver's NETID, silently orphaning the first one. **Fixed in rx-v2.7.10:** the NETID is now generated once on the first-ever pair and kept stable across all subsequent pairs.
+- If you're still seeing this on 2.7.10+, the most likely cause is a TX still on old firmware (pre-2.0.6). Either flash the TX, or factory-reset the hub and re-pair both TXs.
+
+### Re-paired a tank and it came back as "Tank N" instead of my custom name
+- The name + capacity + alerts are preserved by a *tombstone* archive — but only for TXs that sent their MAC in PAIR_REQ (tx-v2.0.11 onwards).
+- A TX paired with older firmware doesn't have a MAC stored in the hub registry, so its delete is a hard-delete and re-pair creates a fresh entry.
+- One-time migration: flash the TX with `tx-v2.0.11` or later, then delete + re-pair once. From then on, the MAC is recorded and future deletes preserve the name.
+
+### Tank still shows in PWA after I deleted it
+- Was a known issue before rx-v2.7.11 — the cloud DB delete didn't propagate to the receiver, so the hub re-synced the tank back into the cloud on its next refresh.
+- **Fixed in rx-v2.7.11 + cloud (deployed 2026-05-21):** the cloud `DELETE` now publishes an MQTT `remove_tx` command to the receiver and waits for ack before removing the DB row. If the receiver is offline, the delete is refused with a clear error so you can retry once it reconnects.
+- If you still see the tank after the cloud says "removed", hard-refresh the PWA (close + reopen) to clear the local cache.
+
+### Pair button on PWA seems to do nothing
+- The receiver listens for 60 seconds. Make sure to hold the transmitter's BOOT button for 2 seconds and release within that window.
+- On rx-v2.7.11+ the PWA shows a "Linking to your account..." spinner while the cloud saves the new tank, followed by "🎉 Paired!" with the tank's name. If you see "no transmitter responded" instead, the receiver heard nothing — check that the receiver and transmitter are within range and that the receiver isn't already paired with the same physical sensor.
+
+### I need to start over completely (resale, lab swap, troubleshooting)
+- Web UI → System tab → **Factory Reset** button. Type `ERASE` to confirm.
+- This wipes Wi-Fi credentials, MQTT credentials, all paired tanks, the tombstone archive, history, and LoRa NETID.
+- The hub reboots into setup AP mode (`TankSync` open network at 192.168.4.1).
 
 ### Battery shows 0%
 - Check the battery voltage divider wiring
