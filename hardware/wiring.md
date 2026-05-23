@@ -122,6 +122,7 @@ Source of truth: `cloud/firmware/Receiver-ESP32-DevKit/main/config.h` (the publi
 | GPIO | Function | Connects to | Notes |
 |---|---|---|---|
 | 0 | BOOT button (planned) | Onboard tactile + external panel button → GND | Strapping pin; momentary press only. Firmware reads after boot for hold-2s/hold-5s pattern (planned). |
+| 2 | Active buzzer (optional, RX 2.8.0+) | Buzzer SIGNAL pin | **Strapping pin** — disconnect during USB flashing or chip stays in download mode. OTA flashing unaffected. Shares onboard blue LED — LED pulses with buzzer. |
 | 13 | WS2812B data | DIN of first LED in chain (2/8/24-config) | 3.3V data line; add 470Ω in series to dampen reflections. 74AHCT125 level shifter only if flicker observed. |
 | 16 | UART2 RX | RYLR998 TXD | DevKit has UART2 free; C3 doesn't |
 | 17 | UART2 TX | RYLR998 RXD | |
@@ -129,7 +130,7 @@ Source of truth: `cloud/firmware/Receiver-ESP32-DevKit/main/config.h` (the publi
 | 22 | I²C SCL | SH1106 SCL | |
 | EN | RESET button | Onboard tactile + external panel button → GND | Hardware reset; pulled HIGH by board |
 | 5V | Power | WS2812B VDD (direct from USB, NOT through 3V3 LDO) | 24-ring needs 2A wall brick |
-| 3.3V | Power | RYLR998 VCC, SH1106 OLED VCC | From on-board LDO |
+| 3.3V | Power | RYLR998 VCC, SH1106 OLED VCC, buzzer VCC | From on-board LDO |
 | GND | Ground | All modules | Single common ground |
 
 #### Wire-by-wire — DevKit ESP32 RX
@@ -158,6 +159,20 @@ ESP32 DevKit GPIO17 (TX2) →  RYLR998 RXD
 ESP32 DevKit GPIO21    →  SH1106 OLED SDA
 ESP32 DevKit GPIO22    →  SH1106 OLED SCL
                           (most OLED modules have onboard 4.7kΩ pull-ups; if not, add to 3V3)
+
+# BUZZER (optional — RX 2.8.0+ enables audible alerts)
+# Active 3-pin buzzer module (has on-board oscillator — no PWM needed).
+# Plays boot tone + low-water + overflow + sensor-offline alerts.
+ESP32 DevKit GPIO2     →  Buzzer SIGNAL (I/O) pin
+ESP32 DevKit 3V3       →  Buzzer VCC
+ESP32 DevKit GND       →  Buzzer GND
+# !! STRAPPING PIN CAVEAT: GPIO2 must read HIGH at reset for normal
+# !! boot. If the buzzer holds the line LOW (or pulls the rail down
+# !! during USB connect), the chip enters ROM download mode and won't
+# !! run firmware. For USB flashing: DISCONNECT the signal wire from
+# !! GPIO2, flash, then reconnect. OTA (over-WiFi) reflashing is
+# !! unaffected — the chip re-reads strapping only at hard reset, not
+# !! during the OTA reboot path.
 
 # USER INTERACTION (PCB-ready; firmware support pending)
 External panel button  →  ESP32 DevKit GPIO0 (parallel with onboard BOOT button) → GND
