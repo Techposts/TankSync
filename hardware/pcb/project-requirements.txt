@@ -1,0 +1,192 @@
+PROJECT TITLE
+TankSync v1.0 — Solar LoRa water-tank monitor: outdoor TX + indoor RX hub for Indian homes
+
+PROJECT REQUIREMENTS
+
+A two-board IoT product. Hardware bench-validated on dev kits with working open-source firmware (github.com/Techposts/tanksync). I need PCBWay to convert proven pin assignments and bench wiring into manufacturable PCBs + matching enclosures + sample units.
+
+A) TX (Tank Transmitter) — outdoor, solar-powered, mounts on overhead/sump tanks. Reads water level via ultrasonic sensor; sends readings via LoRa to indoor hub. Deep-sleeps between wakes for battery life.
+
+B) RX (Receiver / Hub) — indoor, USB-C powered. Receives LoRa from up to 6 paired TX, drives OLED + LED ring, bridges to cloud via WiFi/MQTT, hosts local web UI.
+
+----------------------------------------------------------------------
+1. PCB DESIGN REQUIREMENTS
+----------------------------------------------------------------------
+
+FUNCTIONAL REQUIREMENTS
+
+TX Board:
+- Read distance via ultrasonic sensor (JSN-SR04T / AJ-SR04M, waterproof)
+- Sense battery + solar power via INA219 (I2C) and ADC voltage divider (variant)
+- Charge 18650 Li-ion from solar via CN3791 MPPT + boost converter to 3.3V
+- Communicate with RX over LoRa (RYLR998 module, UART)
+- Deep-sleep between wake cycles (default 60s, configurable to 5–60 min)
+- Status LED + tactile BOOT button (5s hold = AP mode for re-pairing)
+
+RX Board:
+- Receive LoRa packets from up to 6 TX units
+- Drive 1.3" SH1106 OLED (I2C) for live tank levels
+- Drive WS2812B LED chain (2 / 8 / 24 LEDs) for ambient indication
+- Connect to home WiFi, publish telemetry to MQTT broker
+- Host a local HTTP server for configuration (port 80)
+- USB-C input, BOOT/RESET buttons accessible
+
+INPUT/OUTPUT INTERFACES
+
+TX:
+- Screw terminal (2-pin) for ultrasonic sensor cable (field-installable, NOT pre-crimped at factory — sensor cable length varies by tank)
+- Screw terminal or barrel jack (2-pin) for solar panel input
+- 18650 battery holder
+- Tactile BOOT + RESET buttons through enclosure window
+- Status LED visible through enclosure window
+- USB-C for development flashing
+
+RX:
+- USB-C for power + flashing
+- 3-pin connector for WS2812B LED strip (5V, GND, DATA)
+- 4-pin I2C header for SH1106 OLED (3.3V, GND, SDA, SCL) — display can be onboard or off-board
+- BOOT + RESET tactile buttons accessible
+- RYLR998 LoRa module on header (SMA antenna optional, PCB-edge whip default)
+
+PERFORMANCE REQUIREMENTS
+
+TX:
+- MCU: ESP32-C3 SuperMini (RISC-V, 160 MHz, integrated WiFi/BT, PCB antenna)
+- LoRa link: 865 MHz (India ISM band) at 22 dBm, SF7-12 configurable
+- Active current: <5 mA during a wake cycle (~1.5 s of sensor read + LoRa transmit)
+- Deep sleep current: <50 µA average over 60s sleep cycle
+- Sensor accuracy: ±1 cm at 30 cm – 4 m range (JSN-SR04T spec)
+- Battery life target: >12 months in clean Indian sun on a 1.5W panel
+
+RX:
+- MCU: ESP32 DevKit (Tensilica, 240 MHz, WiFi + BT)
+- LoRa: same as TX
+- I2C: 100 kHz standard mode (OLED + future I2C peripherals)
+- WiFi: 2.4 GHz station mode + AP mode (for setup)
+- LED refresh: 30 Hz typical, supports inrush spikes up to 1 A briefly
+
+DIMENSIONS AND PHYSICAL SPECIFICATIONS
+
+TX board: target ~50 × 50 mm, 1.6 mm FR-4, 4 corner mounting holes (M2.5).
+RX board: target ~70 × 50 mm, 1.6 mm FR-4, 4 corner mounting holes (M2.5).
+Both boards must fit inside their respective enclosures with cable routing margins.
+
+POWER REQUIREMENTS
+
+TX: 18650 Li-ion battery (3.0 – 4.2 V). Solar input 5 – 7 V, max 1 A. CN3791 MPPT charges battery; boost converter delivers 3.3 V regulated to ESP32-C3. Reverse-polarity Schottky diode required inline on battery + (we have lost test boards by reversing the holder). Total system current must be <100 µA during deep sleep (no quiescent draw from boost beyond MCU).
+
+RX: USB-C 5 V / 1 A nominal input. LDO to 3.3 V for ESP32 + LoRa. WS2812B chain runs from 5 V rail directly. 1000 µF bulk cap on the 5 V rail near the LED data input — WS2812B can pull >1 A briefly when all LEDs go to white at full brightness (power-on flash, attention modes).
+
+COMPATIBILITY REQUIREMENTS
+
+- ESP32-C3 SuperMini and ESP32 DevKit modules are off-the-shelf parts; ours uses the standard pinouts. We need carrier boards that mount these modules (NOT redesigned MCUs — module-on-carrier is fine and is what the prototypes use).
+- RYLR998 is the chosen LoRa module (UART, 865 MHz). Do not substitute without consulting us — firmware is tied to RYLR998 AT command set.
+- JSN-SR04T / AJ-SR04M ultrasonic — interchangeable, both have a 4-pin header (VCC, GND, TRIG, ECHO). 5V powered, 5V echo output — voltage divider (1k + 2k to GND) on ECHO line is required because ESP32-C3 GPIOs are NOT 5V tolerant.
+- INA219 at I2C 0x40 (default jumper config), 0.1 Ω shunt. Auto-detected by firmware.
+- SH1106 1.3" OLED at I2C 0x3C, 128×64.
+
+RELIABILITY
+
+- Service life: 5+ years
+- TX: -10°C to +60°C, IP65, monsoon + dust + coastal salt-haze
+- RX: 0°C to +45°C, normal humidity
+- Antenna keep-out: >5 mm clear copper around RYLR998 + ESP32-C3 antennas
+- Decoupling: 100 nF + 10 µF within 5 mm of every IC
+
+----------------------------------------------------------------------
+2. ENCLOSURE DESIGN REQUIREMENTS
+----------------------------------------------------------------------
+
+TX ENCLOSURE (outdoor)
+- IP65+ protection (rated for monsoon rain + rooftop dust + summer 45°C)
+- Material: UV-stabilised ABS or polycarbonate (NOT plain ABS — degrades in Indian sun within 18 months)
+- Cable glands: 2 (one for ultrasonic sensor cable, one for solar panel cable), M12 thread, sized for 4–6 mm cable
+- Battery access: removable cover with captive screws, gasket-sealed
+- Mounting tabs: 4 outside the seal, accept standard tank-lid bracket screws
+- Window: small clear/translucent window for status LED visibility
+- Buttons: BOOT + RESET as panel-mount tactile with rubber boots (waterproof)
+- Approximate size: 80 × 80 × 40 mm internal cavity (final size depends on PCB layout + battery orientation)
+- Ergonomic: must mount easily on a tank lid, no sharp edges
+
+RX ENCLOSURE (indoor)
+- IP20 (dust ingress only, no water resistance needed)
+- Material: ABS or PC, smooth/matte finish acceptable
+- Form factor: desktop or wall-mount, reversible hanging holes
+- Window: clear cutout for OLED (or transparent panel covering whole top face)
+- LED diffuser: cutout for WS2812B strip with frosted-acrylic lens or print-in-place diffuser
+- USB-C port access: cutout aligned with onboard USB-C connector
+- Buttons: cutouts for BOOT + RESET (recessed pin-press is fine, no rubber boots needed indoors)
+- Approximate size: 100 × 60 × 30 mm
+- Aesthetic: minimalist, inspired by editorial/calm UI design (the matching app uses light/serif design language)
+- Colour: white or warm grey for primary; brand logo placement on top face (we will provide the logo SVG)
+
+INTERFACE AND OPENING REQUIREMENTS
+
+TX cutouts:
+- 2 cable glands (M12)
+- 1 battery cover (gasketed)
+- 1 LED window (3–5 mm)
+- 2 button windows (rubber-booted tactile)
+
+RX cutouts:
+- 1 OLED window (~30 × 18 mm visible area)
+- 1 LED strip cutout (12 × 20 mm or strip-shaped depending on 2/8/24 chosen)
+- 1 USB-C port (rectangular)
+- 2 button cutouts (recessed)
+
+----------------------------------------------------------------------
+3. SOFTWARE / FIRMWARE
+----------------------------------------------------------------------
+
+We have working firmware (open-source, github.com/Techposts/tanksync). PCBWay does NOT need to write firmware — please verify your schematic against our firmware's pin assignments before fab. Pin tables are provided in the attached "pin-assignments" PDF.
+
+Reprogramming methods supported:
+- USB (CP2102 USB-UART for RX, ESP32-C3 native USB-CDC for TX)
+- OTA over WiFi (cellular OTA via cloud MQTT bridge — already shipped in current firmware)
+
+----------------------------------------------------------------------
+4. ENVIRONMENTAL TESTING REQUIREMENTS
+----------------------------------------------------------------------
+
+TEST OBJECTIVES
+
+Validate that both TX and RX prototypes meet the operating-environment specs before approving for production.
+
+ENVIRONMENTAL PARAMETERS
+
+TX (outdoor):
+- Temperature: -10°C to +60°C operating, soak test at +50°C for 4h
+- Humidity: 10% to 95% RH non-condensing
+- IP65 spray test per IEC 60529 (low-pressure water from any direction, 3 minutes)
+- Dust ingress test: dust chamber 8h
+- UV exposure: 100h accelerated (equivalent to ~1 year Indian rooftop)
+
+RX (indoor):
+- Temperature: 0°C to +45°C operating
+- Humidity: 30% to 70% RH
+
+TEST SAMPLES
+
+2 of each board (TX + enclosure, RX + enclosure) — 4 sample units total.
+
+PASS/FAIL CRITERIA
+
+- Functional: pairing succeeds, LoRa link >-110 dBm at 100 m line-of-sight, OLED renders our test pattern, LED chain cycles through colours, OTA over WiFi completes
+- Battery: TX active <5 mA, deep sleep <50 µA
+- Mechanical: IP65 holds during spray, no water ingress on TX seal
+
+----------------------------------------------------------------------
+5. WHAT WE PROVIDE
+----------------------------------------------------------------------
+
+- Pin assignments PDF (attached)
+- Working firmware, open-source
+- Confirmed BOM with part numbers (attached CSV)
+- System block diagram PDF (attached)
+- Bench-prototype photos (attached)
+
+Open to your component substitutions where they reduce cost without changing function — flag any in the quote. Budget is flexible if quality justifies it.
+
+Volume: 100 – 500 kits in first 12 months (Indiegogo + direct). BOM target: $15 – $22 per unit.
+
+Contact: Ravi Singh, ravi.singh543@gmail.com — SmartGhar Hardware Pvt. Ltd., New Delhi, India.

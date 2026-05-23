@@ -1,25 +1,34 @@
-Component,Quantity (TX),Quantity (RX),Description,Approx Price (USD),Notes
-ESP32-C3 SuperMini,1,1,Main microcontroller with WiFi/BLE,$3.00,AliExpress/Amazon. RX can also use ESP32 DevKit v1.
-RYLR998,1,1,LoRa module 868/915MHz,$10.00,Reyax official or AliExpress
-SH1106 OLED 1.3" 128x64,0,1,Display for RX,$3.00,I2C 0x3C
-JSN-SR04T / AJ-SR04M,1,0,Waterproof ultrasonic sensor,$5.00,20cm-450cm range
-WS2812B LED,2,2,Addressable RGB LEDs,$0.50,Cut from strip
-Tactile push button,1,0,Boot/config/pair button on TX,$0.20,Through-hole 6mm
-Solar panel 6V 180mA,1,0,Polycrystalline ~250x80mm,$1.80,For TX outdoor solar
-CN3791 MPPT Solar Charger,1,0,Buck-MPPT solar to Li-ion charger,$1.45,Replaces TP4056 for solar use; tracks Vmpp
-18650 Li-ion 3000mAh + protected holder,1,0,Single-cell with protection PCB,$2.40,Protection mandatory (CN3791 has no over-discharge cutoff)
-MT3608 DC-DC Boost 3.7V to 5V,1,0,Step-up converter for 5V loads,$0.60,EN pin to GPIO10 recommended for low-power
-100K Resistor 1%,2,0,Variant A only — voltage divider,$0.10,Skip if Variant B (INA219)
-INA219 Module 0.1Ohm shunt,1,0,Variant B only — power monitor over I2C,$1.45,Default I2C addr 0x40
-4.7K Resistor (I2C pull-ups),2,0,Variant B only,$0.10,Often included on INA219 module already
-USB Cable,0,1,USB-C for RX 5V wall power,$2.00,RX is wall-powered indoors
-USB-C 5V wall brick (>= 1.5A),0,1,Wall adapter for RX,$3.00,Standard phone charger works
-Waterproof Enclosure,1,0,IP65 or better,$5.00,For outdoor TX installation
-Jumper Wires,As needed,As needed,For connections,$2.00,22-26 AWG
-Pin Headers,As needed,As needed,2.54mm pitch,$1.00,Optional for modularity
-,,,,,
-TOTAL TRANSMITTER (Variant A - voltage divider),,,,$28.00 - $36.00,Adds solar harvest + voltage-only SoC
-TOTAL TRANSMITTER (Variant B - INA219),,,,$30.00 - $38.00,Adds full charge/discharge/power telemetry
-TOTAL RECEIVER,,,,$18.00 - $25.00,Wall-powered indoor unit
-COMPLETE SYSTEM (TX-A + RX),,,,$46.00 - $61.00,Entry SKU
-COMPLETE SYSTEM (TX-B + RX),,,,$48.00 - $63.00,Premium SKU with power telemetry
+Board,Designator,Description,Qty,Package,Mfr Part / Generic,Notes
+TX,U1,ESP32-C3 SuperMini module,1,Module (header pins),"ESP32-C3 SuperMini (generic, e.g. https://www.aliexpress.com/item/1005006453829627.html)",RISC-V MCU + WiFi/BT + PCB antenna; widely available
+TX,U2,RYLR998 LoRa module,1,Module (4-pin header),REYAX RYLR998,UART AT-command LoRa; 865 MHz IN / 868 MHz EU / 915 MHz US
+TX,U3,INA219 current/voltage sensor,1,SOIC-8 or breakout,Adafruit-style INA219 breakout OR raw chip,I2C @ 0x40 with 0.1 Ω shunt — Variant B only
+TX,U4,CN3791 MPPT solar charger,1,Breakout / SOP-8,CN3791 MPPT module (5V tracking),Charges 18650 from solar panel; tracks Vmpp ≈ 4.5 V
+TX,U5,3.3V boost converter,1,SOT-23-6 or breakout,MT3608 or TPS61023,Boosts 18650 (3.0–4.2V) to 3.3V regulated for ESP32-C3
+TX,SENS1,JSN-SR04T / AJ-SR04M ultrasonic,1,External (cable + screw terminals),JSN-SR04T waterproof,5V powered; sensor cable field-installable (NOT pre-crimped)
+TX,BAT1,18650 Li-ion holder,1,Through-hole or PCB mount,Keystone 1042 or generic,Single 18650 cell holder
+TX,J1,Solar panel input,1,2-pin screw terminal or barrel jack,Phoenix MKDS 1.5 or DC-005,Field-wired to ~6V 1-2W panel
+TX,J2,Sensor cable,1,2-pin screw terminal,Phoenix MKDS 1.5,Field-wired to JSN-SR04T (length varies by tank)
+TX,D1,Schottky reverse-polarity protection,1,SOD-123,SS14 or 1N5819,Inline on 18650 (+) — protects against reversed cell
+TX,D2,Status LED,1,3mm or SMD 0805,Generic green LED,Visible through enclosure window
+TX,SW1,BOOT button,1,Tactile through-hole,6mm tactile w/ rubber boot,Panel-mount; 5s hold = AP mode
+TX,SW2,RESET button,1,Tactile through-hole,6mm tactile w/ rubber boot,Panel-mount; recessed
+TX,R1-R2,Voltage divider for ECHO,2,0805,1k + 2k,Resistive divider on ECHO line (5V → 1.65V for ESP32-C3 GPIO 5)
+TX,R3-R4,Voltage divider for battery (Variant A),2,0805,100k + 100k,1:2 divider for ADC battery monitoring (Variant A only)
+TX,C1-C8,Decoupling caps (100 nF),~8,0603,Generic ceramic,One per IC near power pin
+TX,C9-C12,Bulk caps (10 µF),~4,0805 or 1206,Generic electrolytic,One per IC + boost output
+TX,C13,Inrush cap on WS2812B 5V,1,Electrolytic radial,470 µF / 16V,Smooths the 2 onboard LEDs
+RX,U1,ESP32 DevKit v1 (38-pin),1,Module socketed,"AZ-Delivery / DOIT ESP32 DevKit v1 (CP2102 USB-UART)",240 MHz Tensilica MCU + WiFi/BT + onboard USB-C
+RX,U2,RYLR998 LoRa module,1,Module (4-pin header),REYAX RYLR998,Same as TX
+RX,U3,SH1106 1.3" OLED display,1,Module (4-pin I2C),Generic SH1106 128x64 OLED 1.3 inch white,I2C @ 0x3C; through-hole 4-pin header
+RX,U4,WS2812B LED strip / ring,1,External,Generic WS2812B,User-selectable 2 / 8 / 24 LEDs (configurable via NVS)
+RX,J1,USB-C power input,1,USB-C onboard (on DevKit),Built into DevKit module,5V / 1A nominal
+RX,J2,WS2812B 3-pin connector,1,JST-XH 3-pin,JST-XH-3,5V / GND / DATA — to external LED strip
+RX,J3,OLED 4-pin connector (alternate),1,2.54mm header 4-pin,Generic,Alternative if OLED is off-board
+RX,SW1,BOOT button,1,Tactile,Generic 6mm tactile,Recessed (indoor — no rubber boot needed)
+RX,SW2,RESET button,1,Tactile,Generic 6mm tactile,Recessed
+RX,C1,Inrush cap on WS2812B 5V rail,1,Electrolytic radial,1000 µF / 16V,**Critical** — absorbs >1A spike when all LEDs flash white
+RX,C2-C9,Decoupling caps (100 nF + 10 µF),~8,0603/0805,Generic ceramic + electrolytic,One per IC near power pin
+TX+RX,Antenna,Antenna,1 each,SMA or PCB-edge,SMA bulkhead OR PCB whip,RYLR998 default = PCB whip; SMA optional for external
+ENCLOSURE,Cable glands,2,Cable glands,M12 thread,Generic IP65 PA66 black,Sized for 4-6 mm cable diameter (TX only)
+ENCLOSURE,Gasket,1,Battery cover gasket,EPDM/NBR,Generic,Compresses on screw-down for IP65 seal (TX only)
+ENCLOSURE,Mounting screws,4,M3 stainless,Generic,Outdoor-rated for tank-lid bracket (TX only)
