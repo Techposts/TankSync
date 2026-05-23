@@ -41,8 +41,10 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 - **Multi-Tank**: Support up to 10 transmitters per receiver
 - **Low Power**: Transmitter deep sleeps between readings (configurable 1-1440 min)
 - **Local Display**: SH1106 1.3" OLED on receiver shows tank levels, battery, signal
-- **Web UI**: Built-in configuration interface on the receiver (WiFi, MQTT, LoRa, OTA)
-- **Home Assistant**: Native MQTT auto-discovery integration
+- **Audible Alerts** *(rx-v2.8.0+)*: Optional active 3-pin buzzer on the hub plays boot tone + critical-low + overflow + sensor-offline beeps. Global volume profile (Quiet/Standard/Loud), quiet-hours window, per-alert toggles. Controllable from local web UI, PWA, and Home Assistant.
+- **Sensor Health Safety Nets** *(rx-v2.8.3+)*: Explicit `sensor_error` (TX-side detection) and `sensor_stuck` (variance-window detection on RX) flags catch failing or defective ultrasonic sensors. Surfaced as warning chips in PWA + diagnostic `binary_sensor.*_sensor_not_responding` / `*_sensor_stuck` entities in HA.
+- **Web UI**: Built-in configuration interface on the receiver (WiFi, MQTT, LoRa, OTA, buzzer, LED, OLED)
+- **Home Assistant**: Native MQTT auto-discovery integration + dedicated [HACS integration](https://github.com/Techposts/smartghar-homeassistant) (real-time WebSocket push, bidirectional config, Energy dashboard)
 - **TankSync Cloud**: Web dashboard with push notifications, multi-tank monitoring, QR device linking
 - **MQTT over TLS**: Secure communication between receiver and cloud (port 8883)
 - **OTA Updates**: WiFi OTA for receiver, LoRa OTA relay for transmitter
