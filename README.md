@@ -9,7 +9,7 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 
 <p align="center">
   <img src="hardware/photos/pcb-populated-top.jpg" width="45%" alt="Populated TX PCB (open hardware)" />
-  <img src="hardware/photos/case-side-profile.jpg" width="45%" alt="Assembled TX in its PETG case (current production)" />
+  <img src="hardware/photos/case-sensor-mount.jpg" width="45%" alt="BSP-threaded sensor mount installed on a tank lid (current production)" />
 </p>
 <p align="center">
   <sub><em>Custom circular TX PCB and current-production PETG enclosure (REV 2.2, May 2026) — tested through Delhi summer at 45°C ambient.</em></sub>
