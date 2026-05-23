@@ -144,9 +144,20 @@ More photos + STL files for the case + schematics + 3D STEP models: **[hardware/
 
 ## Home Assistant integration
 
-The hub publishes auto-discovery messages via MQTT — tanks appear automatically as sensor entities. For richer integration (real-time WebSocket push, buzzer entities, sensor-health binary sensors), install the dedicated HACS integration:
+Two routes — pick whichever fits your setup:
 
-👉 **[github.com/Techposts/smartghar-homeassistant](https://github.com/Techposts/smartghar-homeassistant)**
+1. **Native MQTT auto-discovery** — the hub publishes auto-discovery topics; tanks appear in HA as sensor entities with zero setup beyond pointing HA at the same broker. Read-only.
+2. **HACS integration: SmartGhar** — full bidirectional control. Every tank is an HA device with grouped Sensors / Events / Configuration / Diagnostic entities, plus a hub device with buzzer + LED controls. **Capacity, sleep interval, samples-per-wake are editable from inside HA** and ride the same MQTT command channel as the PWA, so both stay in sync.
+
+<p align="center">
+  <img src="docs/firmware/screenshots/hacs/ha-hacs-listing.png"            width="18%" alt="HACS listing — SmartGhar v0.8.0" />
+  <img src="docs/firmware/screenshots/hacs/ha-integration-overview.png"     width="18%" alt="Integration overview — 3 devices, 41 entities" />
+  <img src="docs/firmware/screenshots/hacs/ha-device-page-top.png"          width="18%" alt="Tank device page — info + sensors" />
+  <img src="docs/firmware/screenshots/hacs/ha-device-sensors-events.png"    width="18%" alt="Sensors + Events + Configuration" />
+  <img src="docs/firmware/screenshots/hacs/ha-device-config-diagnostic.png" width="18%" alt="Configuration + Diagnostic — editable from HA" />
+</p>
+
+**HACS repo:** [github.com/Techposts/smartghar-homeassistant](https://github.com/Techposts/smartghar-homeassistant) · **Full setup + entity reference:** [HACS Integration wiki page](https://github.com/Techposts/TankSync/wiki/HACS-Integration)
 
 ## What's NOT in this repo (and why)
 
