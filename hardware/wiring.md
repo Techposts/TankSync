@@ -217,6 +217,51 @@ C3 SuperMini 3.3V or 5V   →  SH1106 OLED VCC
 C3 SuperMini GND          →  SH1106 OLED GND
 ```
 
+### Pin map — ESP32-S3 SuperMini RX
+
+Source: `cloud/firmware/Receiver-ESP32-DevKit/main/boards/s3supermini_pinmap.h` (the S3 build target shares the source tree with the DevKit RX; `idf.py set-target esp32s3` switches the active pinmap). Newer production board — pocket-sized like the C3 but with way more GPIOs, native USB-Serial/JTAG (no CP2102 needed), and onboard addressable WS2812 on GPIO48 so no external LED chain is required for first-boot status.
+
+| GPIO | Function | Connects to | Notes |
+|---|---|---|---|
+| 4 | Active buzzer (optional, RX 2.8.0+) | Buzzer SIGNAL pin | **Free GPIO, no strapping or USB conflict** — safe to leave connected during flashing. Cleaner than DevKit GPIO2. |
+| 8 | I²C SDA | SH1106 SDA | |
+| 9 | I²C SCL | SH1106 SCL | |
+| 16 | UART1 TX | RYLR998 RXD | UART1 is the free general-purpose UART on S3 |
+| 17 | UART1 RX | RYLR998 TXD | |
+| 48 | WS2812B data | Onboard pixel (built-in on SuperMini) — also optional external chain | No external strip required for status; firmware drives onboard pixel and any extended chain in series. |
+| 5V | Power | RYLR998 VCC (5V module variant), external WS2812B chain VDD, buzzer VCC | From USB-C |
+| 3.3V | Power | RYLR998 VCC (3.3V module variant), SH1106 OLED VCC | From on-board LDO |
+| GND | Ground | All modules | Single common ground |
+
+**Pins to avoid:** GPIO19/20 are fixed USB D+/D− by silicon. Strapping pins GPIO0, GPIO45, GPIO46 are kept clear of peripheral roles.
+
+#### Wire-by-wire — ESP32-S3 SuperMini RX
+
+```
+# Onboard WS2812 — already on GPIO48, no wiring needed unless extending
+# (Optional external chain): S3 GPIO48 → 470Ω → ext WS2812 #1 DIN
+#                            S3 5V    → ext WS2812 #1 VDD
+#                            S3 GND   → ext WS2812 #1 GND
+
+# LoRa (UART1)
+S3 SuperMini GPIO17 (RX1) →  RYLR998 TXD
+S3 SuperMini GPIO16 (TX1) →  RYLR998 RXD
+S3 SuperMini 3.3V         →  RYLR998 VCC  (or 5V if your module is the 5V variant)
+S3 SuperMini GND          →  RYLR998 GND
+
+# OLED (I²C)
+S3 SuperMini GPIO8        →  SH1106 OLED SDA
+S3 SuperMini GPIO9        →  SH1106 OLED SCL
+S3 SuperMini 3.3V or 5V   →  SH1106 OLED VCC
+S3 SuperMini GND          →  SH1106 OLED GND
+
+# Buzzer (optional — RX 2.8.0+ enables audible alerts)
+# No strapping caveat here: GPIO4 is free, unlike DevKit's GPIO2.
+S3 SuperMini GPIO4        →  Buzzer SIGNAL (I/O) pin
+S3 SuperMini 3.3V         →  Buzzer VCC
+S3 SuperMini GND          →  Buzzer GND
+```
+
 ---
 
 ## Transmitter (TX) wiring — solar-powered, two power-monitoring variants
