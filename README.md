@@ -8,8 +8,11 @@
 Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and a local-first architecture. Monitor multiple tanks from up to 5 km away. Works even when your internet doesn't.
 
 <p align="center">
-  <img src="docs/images/receiver.jpg" width="45%" alt="Receiver" />
-  <img src="docs/images/transmitter.jpg" width="45%" alt="Transmitter" />
+  <img src="hardware/photos/pcb-populated-top.jpg" width="45%" alt="Populated TX PCB (open hardware)" />
+  <img src="hardware/photos/case-side-profile.jpg" width="45%" alt="Assembled TX in its PETG case (current production)" />
+</p>
+<p align="center">
+  <sub><em>Custom circular TX PCB and current-production PETG enclosure (REV 2.2, May 2026) — tested through Delhi summer at 45°C ambient.</em></sub>
 </p>
 
 ## Try the in-browser flasher first
@@ -110,6 +113,21 @@ idf.py -p /dev/ttyACM0 flash
 2. Captive portal opens (or visit `192.168.4.1`)
 3. Configure home WiFi + (optional) MQTT broker + LoRa settings
 4. **Transmitter** pairs over the air — hold its `BOOT` button for 2 sec, hub LED turns green when paired
+
+## Photos of a real build
+
+<p align="center">
+  <img src="hardware/photos/pcb-bare-top.jpg" width="30%" alt="Bare PCB, fresh from fab" />
+  <img src="hardware/photos/pcb-populated-angle.jpg" width="30%" alt="Populated PCB, angled view" />
+  <img src="hardware/photos/case-open-with-antenna.jpg" width="30%" alt="Opened case showing internals + antenna" />
+</p>
+<p align="center">
+  <img src="hardware/photos/case-lid-with-solar.jpg" width="30%" alt="Lid with integrated solar panel pocket" />
+  <img src="hardware/photos/case-sensor-mount.jpg" width="30%" alt="BSP-threaded sensor mount on a test tank lid" />
+  <img src="hardware/photos/case-top-nut-thread.jpg" width="30%" alt="Close-up of the sensor-mount nut + thread" />
+</p>
+
+More photos + STL files for the case + schematics + 3D STEP models: **[hardware/](hardware/)**.
 
 ## Home Assistant integration
 
