@@ -187,6 +187,6 @@ Issues and PRs welcome. Read the [wiring guide](hardware/wiring.md) before openi
 
 ## Author + brand
 
-**Ravi Singh** ([@ravis1ngh on YouTube](https://www.youtube.com/@ravis1ngh)) — building open-source home infrastructure in India.
+**Ravi Singh** ([@ravis1ngh on YouTube](https://www.youtube.com/@ravis1ngh)) — solo-building open-source home infrastructure in India under the **TechPosts Media** / **SmartGhar** banner. Design, firmware, hardware, PCB layouts, and 3D-printed enclosures — all done in-house.
 
 **TankSync** is part of the **SmartGhar** ecosystem ([smartghar.org](https://smartghar.org)) — calm, local-first smart-home infrastructure engineered for real-world Indian deployments.

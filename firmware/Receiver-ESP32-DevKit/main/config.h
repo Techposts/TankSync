@@ -91,9 +91,9 @@
 // OTA - server-proxied (TankSync cloud holds the GitHub PAT, not firmware)
 // ============================================================================
 // Manifest endpoint mirrors the GH /releases/latest JSON shape with tag and
-// asset URLs normalized so the OTA manager needs no parsing changes. Server
-// implementation: cloud/server/firmware.js. Asset prefix matches what
-// .github/workflows/firmware-release.yml writes to the cloud repo's releases.
+// asset URLs normalized so the OTA manager needs no parsing changes. The
+// SmartGhar firmware proxy serves this endpoint. Asset prefix matches the
+// .bin name written by the public release workflow.
 #define OTA_MANIFEST_URL        "https://tanksync.smartghar.org/api/firmware/latest?target=rx"
 #define OTA_CHECK_INTERVAL_H    24      // Auto-check every 24 hours
 #define OTA_ASSET_PREFIX        "tanksync-receiver-rx-v"

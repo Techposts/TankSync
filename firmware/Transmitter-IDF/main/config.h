@@ -37,8 +37,8 @@
 // MCU is in reset/sleep — but only if the pin is actively driven LOW (a
 // floating input + ESP32's internal weak pull-up + ESD-diode leakage gives
 // ~0.77V on the gate, enough to drag the P-FET gate node low and keep the
-// loads partially on, which is what Ravi measured before this gate-drive
-// was wired up in firmware).
+// loads partially on, which is what was measured on the bench before this
+// gate-drive was wired up in firmware).
 //
 // Wiring note (REV 2.2 as-built, 2026-05-17): GPIO10 was originally listed
 // in the schematic plan to gate the MT3608 boost converter's EN pin — that

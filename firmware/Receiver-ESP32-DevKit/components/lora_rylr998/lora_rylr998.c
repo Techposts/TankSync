@@ -464,7 +464,7 @@ static void lora_rx_task(void *arg) {
                 // resurrect the archived entry with its original name,
                 // address, capacity, alerts, sleep_s — preserving all the
                 // user's customization. This is the "rename, delete, re-pair
-                // restores everything" behaviour Ravi explicitly asked for.
+                // restores everything" behaviour intended by design.
                 if (!is_restore && pair_mac_valid) {
                     int t_idx = registry_archive_find_by_mac(pair_mac);
                     if (t_idx >= 0) {

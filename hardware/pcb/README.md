@@ -1,6 +1,6 @@
 # TankSync PCB Designs
 
-Both boards were designed by Ravi Singh in EasyEDA. The current production revision (**REV 2.2**, May 2026) has been **bench-tested at 45 °C ambient through Delhi summer** with no observable RYLR998 RSSI drift or boost-converter sag.
+Both boards were designed by **Ravi Singh** in EasyEDA — solo design work, no hardware team. The current production revision (**REV 2.2**, May 2026) has been **bench-tested at 45 °C ambient through Delhi summer** with no observable RYLR998 RSSI drift or boost-converter sag.
 
 The TX is a **custom circular PCB** sized to drop straight into the [circular-v1 enclosure](../cases/circular-v1/). The RX is a **rectangular carrier** that sockets an ESP32 DevKit v1 (CP2102) module — no microcontroller redesign needed.
 

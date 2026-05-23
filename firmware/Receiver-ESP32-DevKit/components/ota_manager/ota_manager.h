@@ -4,9 +4,8 @@
  * Two update paths:
  *   1. Cloud manifest: auto-check every 24h + manual trigger
  *      GET https://tanksync.smartghar.org/api/firmware/latest?target=rx
- *      Server proxies GitHub releases of private tanksync-cloud repo using
- *      a server-side PAT. Returns GH-shape JSON; firmware needs no parser
- *      changes. Downloads asset matching "tanksync-receiver-rx-v*.bin".
+ *      The SmartGhar firmware proxy returns GH-shape JSON; firmware needs
+ *      no parser changes. Downloads asset matching "tanksync-receiver-rx-v*.bin".
  *
  *   2. Manual upload: caller provides a URL to a .bin file
  *      (web_server passes the HTTP upload URL to ota_manager_flash_url)

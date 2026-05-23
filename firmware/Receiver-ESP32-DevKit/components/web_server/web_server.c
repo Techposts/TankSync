@@ -476,7 +476,7 @@ static const char DASHBOARD_HTML[] =
 "<details style='border:1px solid var(--line);background:var(--paper);padding:12px 14px;margin-bottom:14px' id='tx-howto-details'>\n"
 "<summary style='cursor:pointer;font-family:var(--serif);font-size:14px;font-weight:600'>How to update a transmitter (Wi-Fi)</summary>\n"
 "<ol style='margin-top:12px;padding-left:22px;font-family:var(--serif);font-size:14px;line-height:1.7'>\n"
-"<li>Download the latest TX firmware from the <a href='https://github.com/Techposts/tanksync-cloud/releases?q=tx-v' target='_blank' rel='noopener'>cloud releases page</a> — pick the file named <code>tanksync-transmitter-tx-v…bin</code>.</li>\n"
+"<li>Download the latest TX firmware from the <a href='https://github.com/Techposts/TankSync/releases?q=tx-v' target='_blank' rel='noopener'>releases page</a> — pick the file named <code>tanksync-transmitter-tx-v…bin</code>.</li>\n"
 "<li>On the transmitter, hold the <strong>BOOT</strong> button for ~5 seconds until the status LED turns blue (AP mode active).</li>\n"
 "<li>On your phone or laptop, join the Wi-Fi network <strong>TankSync-TX-XXXX</strong> (no password) — XXXX is unique per device.</li>\n"
 "<li>Open <a href='http://192.168.4.1' target='_blank' rel='noopener'>http://192.168.4.1</a> in your browser. The TX setup page loads.</li>\n"
