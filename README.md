@@ -76,7 +76,18 @@ Includes block diagrams for both DevKit-RX and C3-RX, full TX power chain with s
 
 ## Quick Start
 
-### Option 1: Pre-built Firmware (Recommended)
+### Option 1: Browser flasher (easiest — no install)
+
+👉 **[tanksync.smartghar.org/firmware/](https://tanksync.smartghar.org/firmware/)**
+
+Plug your board into a USB port, pick the right card (Receiver Hub or Transmitter), click **Install**. WebSerial does the flashing through Chrome/Edge (Firefox/Safari don't support WebSerial yet). Takes ~45 seconds per board.
+
+- Works on macOS, Linux, Windows, and ChromeOS
+- ESP32-C3 SuperMini: no driver needed (native USB-Serial/JTAG)
+- ESP32 DevKit: install the [Silicon Labs CP2102 driver](https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers) first
+- ESP32 DevKit + buzzer: disconnect the buzzer signal wire before first-time USB flashing (GPIO2 is a strapping pin); reconnect after
+
+### Option 2: esptool.py (CLI)
 
 Download the latest `.bin` files from [Releases](https://github.com/Techposts/LoRa-Water-Tank-Monitor/releases).
 
@@ -91,7 +102,7 @@ esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-vX.
 esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-vX.Y.Z.bin
 ```
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 **Prerequisites:** [ESP-IDF v5.4+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 
