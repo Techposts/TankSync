@@ -1,85 +1,102 @@
 name: Build & Release Firmware
 
+# Triggered when the sync workflow (in the private tanksync-cloud repo)
+# pushes a tag here. Per the per-binary tag scheme in RELEASES.md:
+#
+#   rx-v*    → builds firmware/Receiver-ESP32-DevKit/  for ESP32
+#   tx-v*    → builds firmware/Transmitter-IDF/        for ESP32-C3
+#   rxc3-v*  → builds firmware/Receiver-ESP32-C3/      for ESP32-C3
+#
+# Only ONE binary is built per tag (matches the tag prefix). The result is
+# attached to a GitHub Release on this public repo with notes generated
+# from the tag annotation that was written on private.
+
 on:
   push:
     tags:
-      - 'v*'
+      - 'rx-v*'
+      - 'tx-v*'
+      - 'rxc3-v*'
 
 jobs:
   build:
+    name: Build firmware for ${{ github.ref_name }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - name: receiver
-            path: firmware/receiver
-            target: esp32
-            binary: tanksync_receiver.bin
-          - name: receiver-c3
-            path: firmware/receiver-c3
-            target: esp32c3
-            binary: tanksync_receiver.bin
-          - name: transmitter
-            path: firmware/transmitter
-            target: esp32c3
-            binary: tanksync_transmitter.bin
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history so `git tag -l --format` reads annotation
+
+      - name: Identify target from tag
+        id: meta
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "${TAG}" in
+            rx-v*)
+              echo "kind=receiver"          >> "$GITHUB_OUTPUT"
+              echo "path=firmware/Receiver-ESP32-DevKit"  >> "$GITHUB_OUTPUT"
+              echo "target=esp32"           >> "$GITHUB_OUTPUT"
+              echo "binary=tanksync_receiver.bin"  >> "$GITHUB_OUTPUT"
+              echo "asset=tanksync-receiver-${TAG}.bin"   >> "$GITHUB_OUTPUT"
+              ;;
+            tx-v*)
+              echo "kind=transmitter"       >> "$GITHUB_OUTPUT"
+              echo "path=firmware/Transmitter-IDF"        >> "$GITHUB_OUTPUT"
+              echo "target=esp32c3"         >> "$GITHUB_OUTPUT"
+              echo "binary=tanksync_transmitter.bin"  >> "$GITHUB_OUTPUT"
+              echo "asset=tanksync-transmitter-${TAG}.bin" >> "$GITHUB_OUTPUT"
+              ;;
+            rxc3-v*)
+              echo "kind=receiver-c3"       >> "$GITHUB_OUTPUT"
+              echo "path=firmware/Receiver-ESP32-C3"      >> "$GITHUB_OUTPUT"
+              echo "target=esp32c3"         >> "$GITHUB_OUTPUT"
+              echo "binary=tanksync_receiver.bin"  >> "$GITHUB_OUTPUT"
+              echo "asset=tanksync-receiver-c3-${TAG}.bin" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
       - name: Build with ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.4
-          target: ${{ matrix.target }}
-          path: ${{ matrix.path }}
+          target: ${{ steps.meta.outputs.target }}
+          path: ${{ steps.meta.outputs.path }}
 
-      - name: Rename binary
+      - name: Rename binary for release
         run: |
-          cp ${{ matrix.path }}/build/${{ matrix.binary }} \
-             tanksync-${{ matrix.name }}-${{ github.ref_name }}.bin
+          cp "${{ steps.meta.outputs.path }}/build/${{ steps.meta.outputs.binary }}" \
+             "${{ steps.meta.outputs.asset }}"
+          ls -la "${{ steps.meta.outputs.asset }}"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: tanksync-${{ matrix.name }}-${{ github.ref_name }}.bin
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
+      - name: Read tag annotation as release body
+        id: notes
+        run: |
+          BODY=$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}")
+          {
+            echo "body<<__END_OF_BODY__"
+            echo "$BODY"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Flashing"
+            echo ''
+            echo '```bash'
+            echo "esptool.py --chip ${{ steps.meta.outputs.target }} -b 460800 \\"
+            echo "  write_flash 0x10000 ${{ steps.meta.outputs.asset }}"
+            echo '```'
+            echo ""
+            echo "Or use the [browser flasher](https://tanksync.smartghar.org/firmware) for a one-click install."
+            echo "__END_OF_BODY__"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            receiver/tanksync-receiver-${{ github.ref_name }}.bin
-            receiver-c3/tanksync-receiver-c3-${{ github.ref_name }}.bin
-            transmitter/tanksync-transmitter-${{ github.ref_name }}.bin
-          generate_release_notes: true
-          body: |
-            ## Firmware Binaries
-
-            | Binary | Board | Description |
-            |--------|-------|-------------|
-            | `tanksync-receiver-${{ github.ref_name }}.bin` | ESP32 DevKit | Receiver firmware |
-            | `tanksync-receiver-c3-${{ github.ref_name }}.bin` | ESP32-C3 | Receiver firmware (C3 variant) |
-            | `tanksync-transmitter-${{ github.ref_name }}.bin` | ESP32-C3 | Transmitter firmware |
-
-            ### Flashing
-            ```bash
-            # Receiver (ESP32 DevKit)
-            esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-${{ github.ref_name }}.bin
-
-            # Receiver (ESP32-C3)
-            esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-${{ github.ref_name }}.bin
-
-            # Transmitter (ESP32-C3)
-            esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-${{ github.ref_name }}.bin
-            ```
-
-            Or use the **OTA update** via the receiver's web UI.
+          files: ${{ steps.meta.outputs.asset }}
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
