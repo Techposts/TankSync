@@ -1,11 +1,11 @@
-# TankSync — open-source smart water tank monitoring
+# TankSync — reliable smart water monitoring
 
 [![Firmware: AGPL-3.0](https://img.shields.io/badge/Firmware-AGPL--3.0-blue.svg)](LICENSE)
 [![Hardware: CC BY-SA 4.0](https://img.shields.io/badge/Hardware-CC%20BY--SA%204.0-orange.svg)](hardware/LICENSE)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.4-red.svg)](https://docs.espressif.com/projects/esp-idf/)
 [![Home Assistant](https://img.shields.io/badge/HA-Integration-blue.svg)](https://github.com/Techposts/smartghar-homeassistant)
 
-Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and a local-first architecture. Monitor multiple tanks from up to 5 km away. Works even when your internet doesn't.
+**Never worry about your water tank again.** A solar-powered sensor on the rooftop, a quiet hub on the wall, and smart water monitoring that keeps working — even when the internet doesn't. Long-range LoRa (RYLR998) to an ESP32 hub, local web UI, Home Assistant via HACS, optional cloud PWA. Open at the core.
 
 <p align="center">
   <img src="hardware/photos/pcb-populated-top.jpg" width="45%" alt="Populated TX PCB (open hardware)" />
@@ -21,14 +21,16 @@ Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and
 
 No `esptool`, no Python, no CLI. Plug your board into USB, click Install, the browser does the flashing through WebSerial. Works on Chrome/Edge desktop. Takes ~45 seconds per board.
 
-## Why TankSync
+## Why TankSync — engineered to be reliable, not just smart
 
-- **Local-first.** Your hub keeps working when our cloud is down, when your ISP is down, when WiFi is down (LoRa runs without internet).
-- **Long range.** Through-wall LoRa lets a single hub cover the whole property — terrace tanks, sump rooms, garden, borewell, all from one wall-mounted display.
-- **Multi-tank.** Up to 10 transmitters per hub. Solar-powered TXes deep-sleep between readings (3-month battery on a single 18650).
-- **Open at the core.** Firmware (AGPL-3.0) and hardware (CC BY-SA) are open. The HA integration is MIT. Fork it, modify it, deploy it.
-- **Home Assistant native.** Auto-discovery via MQTT plus a dedicated [HACS integration](https://github.com/Techposts/smartghar-homeassistant) with real-time WebSocket push.
-- **Cloud is optional.** Use the firmware locally with your own MQTT broker + your own dashboard. Or use [tanksync.smartghar.org](https://tanksync.smartghar.org) for hosted convenience.
+Most "smart tank" products treat the cloud as the product. TankSync treats **reliability** as the product — and the cloud as an optional layer of polish on top.
+
+- **Works fully offline.** Hub keeps showing levels, lighting the LED ring, and beeping on overflow — even when your WiFi, your ISP, or our cloud is down. Local operation is the default; cloud is opt-in.
+- **Long-range LoRa, no rooftop WiFi.** Sensor talks to the hub over 865 MHz LoRa — through concrete walls, between floors, across a property. Up to 5 km line-of-sight. The rooftop doesn't need WiFi. Ever.
+- **Solar-powered transmitter.** Mounts on the tank lid. Charges in regular daylight, runs on a single 18650, deep-sleeps between readings. Months of autonomy. No wires to the tank.
+- **Home Assistant native.** Auto-discovery via MQTT plus a dedicated [HACS integration](https://github.com/Techposts/smartghar-homeassistant) — every tank shows up as an HA device with live sensors, fill events, and editable settings.
+- **Open at the core.** Firmware (AGPL-3.0), hardware (CC BY-SA 4.0), schematics, BOM, and flashing tools are all public. Self-host it. Fork it. Modify it. Audit it. No vendor lock-in.
+- **Built for Indian realities.** Designed and tested through Delhi summer (45 °C ambient). UV-stabilised PETG, IP65 sealing, monsoon-ready. Engineered for terrace tanks, high-rise apartments, thick walls, and unreliable connectivity.
 
 ## Architecture
 
