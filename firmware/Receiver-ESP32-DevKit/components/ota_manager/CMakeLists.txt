@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "ota_manager.c"
     INCLUDE_DIRS "."
     REQUIRES
+        tanksync_version
         esp_https_ota
         esp_http_client
         app_update

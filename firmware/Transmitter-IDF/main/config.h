@@ -9,8 +9,12 @@
 
 // ============================================================================
 // FIRMWARE
+// Version lives in ./VERSION (single source of truth). CMake reads it, sets
+// PROJECT_VER (embedded into esp_app_desc.version at offset 0x30), and emits
+// version_gen.h with FIRMWARE_VERSION as a #define. To bump version, edit
+// ./VERSION only — nothing else.
 // ============================================================================
-#define FIRMWARE_VERSION        "2.0.12"
+#include "version_gen.h"
 #define FIRMWARE_TYPE           "transmitter"
 
 // ============================================================================

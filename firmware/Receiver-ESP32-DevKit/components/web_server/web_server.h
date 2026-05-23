@@ -25,6 +25,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "version_gen.h"   // single source of truth for FIRMWARE_VERSION
 
 #ifndef WEB_PORT
 #define WEB_PORT        80
@@ -32,9 +33,13 @@
 #ifndef WEB_MAX_SOCKETS
 #define WEB_MAX_SOCKETS 5
 #endif
-#ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "2.7.13"
-#endif
+// FIRMWARE_VERSION comes via the generated version_gen.h (included from
+// main/config.h, which is included by every translation unit that includes
+// this header). The fallback that used to live here ("2.7.13") was a major
+// foot-gun: it silently shadowed config.h's value when both got included,
+// making every web UI display, OTA check, and MQTT report show 2.7.13
+// regardless of the actual built version. Now there is exactly one source
+// of truth — the VERSION file at the firmware root — and nothing else.
 
 // LED slot layout (canonical defs in main/config.h). Fallbacks here so the
 // web_server component's identify endpoints compile in isolation.

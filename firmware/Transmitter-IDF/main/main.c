@@ -566,9 +566,8 @@ void app_main(void) {
     s_boot_count++;
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
 
-    ESP_LOGI(TAG, "TankSync TX v%s boot #%" PRIu32 " (wakeup: %d)",
-             FIRMWARE_VERSION, s_boot_count, (int)cause);
-    ESP_LOGD(TAG, "fp %08X", (unsigned)TS_BUILD_FP);
+    ESP_LOGI(TAG, "TankSync TX v%s boot #%" PRIu32 " (wakeup: %d, build %08X)",
+             FIRMWARE_VERSION, s_boot_count, (int)cause, (unsigned)TS_BUILD_FP);
 
 #if SENSOR_DIAG_MODE
     // Diagnostic firmware: don't touch LoRa, deep sleep, OTA, power mgmt.

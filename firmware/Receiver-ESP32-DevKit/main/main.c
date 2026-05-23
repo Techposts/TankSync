@@ -1183,8 +1183,7 @@ static void history_timer_cb(void *arg) {
 // app_main
 // ─────────────────────────────────────────────────────────────────────────────
 void app_main(void) {
-    ESP_LOGI(TAG, "TankSync Receiver v%s booting...", FIRMWARE_VERSION);
-    ESP_LOGD(TAG, "fp %08X", (unsigned)TS_BUILD_FP);
+    ESP_LOGI(TAG, "TankSync Receiver v%s booting (build %08X)", FIRMWARE_VERSION, (unsigned)TS_BUILD_FP);
 
     // ── 1. NVS ──
     esp_err_t err = nvs_flash_init();

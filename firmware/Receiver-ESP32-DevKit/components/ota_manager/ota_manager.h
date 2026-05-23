@@ -21,9 +21,7 @@
 #include "esp_err.h"
 
 // OTA configuration defaults (canonical values live in main/config.h)
-#ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION        "2.8.4"
-#endif
+#include "version_gen.h"   // single source of truth for FIRMWARE_VERSION
 #ifndef OTA_MANIFEST_URL
 #define OTA_MANIFEST_URL        "https://tanksync.smartghar.org/api/firmware/latest?target=rx"
 #endif

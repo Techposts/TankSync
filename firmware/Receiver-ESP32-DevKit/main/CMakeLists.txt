@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "main.c"
     INCLUDE_DIRS "."
     REQUIRES
+        tanksync_version
         lora_rylr998
         transmitter_registry
         wifi_manager

@@ -13,9 +13,14 @@
 #pragma once
 
 // ============================================================================
-// FIRMWARE VERSION - update this on every release
+// FIRMWARE VERSION — single source of truth lives in ../VERSION
+// CMake reads that file → sets PROJECT_VER → configure_file() emits
+// version_gen.h with FIRMWARE_VERSION as a #define. To bump version,
+// edit ../VERSION only. CMake also propagates the value into
+// esp_app_desc_t.version at flash offset 0x30 so the binary self-
+// reports the same string the C code uses.
 // ============================================================================
-#define FIRMWARE_VERSION        "2.8.4"
+#include "version_gen.h"
 #define FIRMWARE_TYPE           "receiver"
 
 // ============================================================================

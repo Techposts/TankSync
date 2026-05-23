@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "main.c"
     INCLUDE_DIRS "."
     REQUIRES
+        tanksync_version
         sensor_sr04
         battery_monitor
         lora_tx

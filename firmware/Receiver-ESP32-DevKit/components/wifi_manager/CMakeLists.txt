@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "wifi_manager.c"
     INCLUDE_DIRS "."
     REQUIRES
+        tanksync_version
         esp_wifi
         esp_netif
         esp_event
