@@ -1,228 +1,150 @@
-# TankSync - LoRa Water Tank Monitor
+# TankSync — open-source smart water tank monitoring
 
-[![License: MIT](https://img.shields.io/badge/Firmware-MIT-green.svg)](LICENSE)
-[![License: AGPL-3.0](https://img.shields.io/badge/Cloud-AGPL--3.0-blue.svg)](pwa/LICENSE)
+[![Firmware: AGPL-3.0](https://img.shields.io/badge/Firmware-AGPL--3.0-blue.svg)](LICENSE)
+[![Hardware: CC BY-SA 4.0](https://img.shields.io/badge/Hardware-CC%20BY--SA%204.0-orange.svg)](hardware/LICENSE)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.4-red.svg)](https://docs.espressif.com/projects/esp-idf/)
-[![GitHub Release](https://img.shields.io/github/v/release/Techposts/LoRa-Water-Tank-Monitor)](https://github.com/Techposts/LoRa-Water-Tank-Monitor/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/Techposts/LoRa-Water-Tank-Monitor)](https://github.com/Techposts/LoRa-Water-Tank-Monitor/stargazers)
+[![Home Assistant](https://img.shields.io/badge/HA-Integration-blue.svg)](https://github.com/Techposts/smartghar-homeassistant)
 
-Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and a cloud dashboard. Monitor multiple tanks from up to 5km away with no WiFi needed between sensor and receiver.
+Long-range wireless water tank level monitoring using LoRa (RYLR998), ESP32, and a local-first architecture. Monitor multiple tanks from up to 5 km away. Works even when your internet doesn't.
 
 <p align="center">
   <img src="docs/images/receiver.jpg" width="45%" alt="Receiver" />
   <img src="docs/images/transmitter.jpg" width="45%" alt="Transmitter" />
 </p>
 
+## Try the in-browser flasher first
+
+👉 **[tanksync.smartghar.org/firmware/](https://tanksync.smartghar.org/firmware/)**
+
+No `esptool`, no Python, no CLI. Plug your board into USB, click Install, the browser does the flashing through WebSerial. Works on Chrome/Edge desktop. Takes ~45 seconds per board.
+
+## Why TankSync
+
+- **Local-first.** Your hub keeps working when our cloud is down, when your ISP is down, when WiFi is down (LoRa runs without internet).
+- **Long range.** Through-wall LoRa lets a single hub cover the whole property — terrace tanks, sump rooms, garden, borewell, all from one wall-mounted display.
+- **Multi-tank.** Up to 10 transmitters per hub. Solar-powered TXes deep-sleep between readings (3-month battery on a single 18650).
+- **Open at the core.** Firmware (AGPL-3.0) and hardware (CC BY-SA) are open. The HA integration is MIT. Fork it, modify it, deploy it.
+- **Home Assistant native.** Auto-discovery via MQTT plus a dedicated [HACS integration](https://github.com/Techposts/smartghar-homeassistant) with real-time WebSocket push.
+- **Cloud is optional.** Use the firmware locally with your own MQTT broker + your own dashboard. Or use [tanksync.smartghar.org](https://tanksync.smartghar.org) for hosted convenience.
+
 ## Architecture
 
 ```
-                    LoRa 865/915 MHz (up to 5km)
-                    =========================>
-  TRANSMITTER                                          RECEIVER
-  ESP32-C3 SuperMini                                   ESP32 DevKit v1
-  + SR04T Ultrasonic                                   + RYLR998 LoRa
-  + RYLR998 LoRa                                      + SH1106 1.3" OLED
-  + 18650 Battery                                      + WS2812B LED
-  + Solar (optional)                                   + WiFi
+                    LoRa 865/915 MHz (up to 5 km, through walls)
+                    ==============================================>
+  TRANSMITTER                                          HUB (RECEIVER)
+  ESP32-C3 SuperMini                                   ESP32 DevKit
+  + JSN-SR04T Ultrasonic                               + RYLR998 LoRa
+  + RYLR998 LoRa                                       + SH1106 OLED
+  + 18650 + solar                                      + WS2812 LED ring
+                                                       + WiFi (optional)
                                                           |
                                               +-----------+-----------+
                                               |                       |
-                                       MQTT over TLS            Web UI
+                                       MQTT (TLS)              Local web UI
                                               |              192.168.x.x
                                     +---------+---------+
                                     |                   |
-                              Home Assistant      TankSync Cloud
-                              (auto-discovery)    tanksync.smartghar.org
+                              Home Assistant      Cloud dashboard
+                              (HACS integration)  (optional, hosted)
 ```
-
-## Features
-
-- **Long Range**: RYLR998 LoRa module, 5km+ line of sight
-- **Multi-Tank**: Support up to 10 transmitters per receiver
-- **Low Power**: Transmitter deep sleeps between readings (configurable 1-1440 min)
-- **Local Display**: SH1106 1.3" OLED on receiver shows tank levels, battery, signal
-- **Audible Alerts** *(rx-v2.8.0+)*: Optional active 3-pin buzzer on the hub plays boot tone + critical-low + overflow + sensor-offline beeps. Global volume profile (Quiet/Standard/Loud), quiet-hours window, per-alert toggles. Controllable from local web UI, PWA, and Home Assistant.
-- **Sensor Health Safety Nets** *(rx-v2.8.3+)*: Explicit `sensor_error` (TX-side detection) and `sensor_stuck` (variance-window detection on RX) flags catch failing or defective ultrasonic sensors. Surfaced as warning chips in PWA + diagnostic `binary_sensor.*_sensor_not_responding` / `*_sensor_stuck` entities in HA.
-- **Web UI**: Built-in configuration interface on the receiver (WiFi, MQTT, LoRa, OTA, buzzer, LED, OLED)
-- **Home Assistant**: Native MQTT auto-discovery integration + dedicated [HACS integration](https://github.com/Techposts/smartghar-homeassistant) (real-time WebSocket push, bidirectional config, Energy dashboard)
-- **TankSync Cloud**: Web dashboard with push notifications, multi-tank monitoring, QR device linking
-- **MQTT over TLS**: Secure communication between receiver and cloud (port 8883)
-- **OTA Updates**: WiFi OTA for receiver, LoRa OTA relay for transmitter
-- **Captive Portal**: Auto-redirect WiFi setup on iOS, Android, and Windows
-- **Remote Config**: Push sleep interval and sample count to transmitters over LoRa
-- **Email Verification**: Resend API + Cloudflare Turnstile on signup
-- **Auto MQTT Provisioning**: QR code scan auto-configures receiver's cloud MQTT connection
 
 ## Hardware
 
-| Component | Part | Approx. Cost |
-|-----------|------|-------------|
-| Receiver MCU | ESP32 DevKit v1 (or ESP32-C3 SuperMini) | $4-8 |
-| Transmitter MCU | ESP32-C3 SuperMini | $3 |
-| LoRa Module | REYAX RYLR998 (x2) | $8 each |
-| Ultrasonic Sensor | JSN-SR04T / AJ-SR04M (waterproof) | $4 |
-| Display | SH1106 1.3" OLED I2C | $3 |
-| Battery | 18650 LiPo + protected holder | $2.40 |
-| Solar charger | CN3791 MPPT (replaces TP4056 for solar TX) | $1.45 |
-| Boost converter | MT3608 3.7V → 5V | $0.60 |
-| Power monitor (optional) | INA219 over I2C | $1.45 |
+| Component | Part | Approx cost (INR) |
+|-----------|------|-------------------|
+| Receiver MCU | ESP32 DevKit v1 | ₹300–400 |
+| Transmitter MCU | ESP32-C3 SuperMini | ₹200 |
+| LoRa module | REYAX RYLR998 (×2) | ₹650 each |
+| Ultrasonic sensor | JSN-SR04T (waterproof) | ₹350 |
+| Display | SH1106 1.3" OLED I²C | ₹250 |
+| Battery | Protected 18650 + holder | ₹200 |
+| Solar charger | CN3791 MPPT module | ₹120 |
+| Boost converter | MT3608 3.7 V → 5 V | ₹50 |
 
-**Total: ~$46-63 per complete system** (entry vs premium SKU)
+Total: **~₹3,800-5,200 per complete system** (one hub + one tank). Per-tank addition: ~₹1,500.
 
-📐 **[Detailed wiring diagrams, pin connections, and power chain →](hardware/wiring.md)**
-Includes block diagrams for both DevKit-RX and C3-RX, full TX power chain with solar charging, and both power-monitoring variants (voltage divider vs INA219 over I2C with auto-detect).
-
+📐 **[Detailed wiring + power chains →](hardware/wiring.md)**
 📋 **[Full BOM →](hardware/BOM.csv)**
 
-## Quick Start
+## Quick start
 
 ### Option 1: Browser flasher (easiest — no install)
 
 👉 **[tanksync.smartghar.org/firmware/](https://tanksync.smartghar.org/firmware/)**
 
-Plug your board into a USB port, pick the right card (Receiver Hub or Transmitter), click **Install**. WebSerial does the flashing through Chrome/Edge (Firefox/Safari don't support WebSerial yet). Takes ~45 seconds per board.
-
-- Works on macOS, Linux, Windows, and ChromeOS
-- ESP32-C3 SuperMini: no driver needed (native USB-Serial/JTAG)
-- ESP32 DevKit: install the [Silicon Labs CP2102 driver](https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers) first
-- ESP32 DevKit + buzzer: disconnect the buzzer signal wire before first-time USB flashing (GPIO2 is a strapping pin); reconnect after
+Plug your board into a USB port, pick the right card (Receiver Hub or Transmitter), click Install. Done in ~45 sec.
 
 ### Option 2: esptool.py (CLI)
 
-Download the latest `.bin` files from [Releases](https://github.com/Techposts/LoRa-Water-Tank-Monitor/releases).
+Download the latest `.bin` from [Releases](../../releases).
 
 ```bash
 # Receiver (ESP32 DevKit)
-esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-vX.Y.Z.bin
+esptool.py --chip esp32 -b 460800 write_flash 0x10000 tanksync-receiver-rx-vX.Y.Z.bin
 
-# Receiver (ESP32-C3 SuperMini)
-esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-receiver-c3-vX.Y.Z.bin
-
-# Transmitter (ESP32-C3)
-esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-vX.Y.Z.bin
+# Transmitter (ESP32-C3 SuperMini)
+esptool.py --chip esp32c3 -b 460800 write_flash 0x10000 tanksync-transmitter-tx-vX.Y.Z.bin
 ```
 
-### Option 3: Build from Source
+### Option 3: Build from source
 
-**Prerequisites:** [ESP-IDF v5.4+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
+Prerequisites: [ESP-IDF v5.4+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 
 ```bash
-# Receiver (ESP32 DevKit)
-cd firmware/receiver
+# Receiver Hub
+cd firmware/Receiver-ESP32-DevKit
 idf.py build
 idf.py -p /dev/ttyUSB0 flash
 
-# Receiver (ESP32-C3)
-cd firmware/receiver-c3
-idf.py set-target esp32c3
-idf.py build
-idf.py -p /dev/ttyACM0 flash
-
-# Transmitter (ESP32-C3)
-cd firmware/transmitter
+# Transmitter
+cd firmware/Transmitter-IDF
 idf.py set-target esp32c3
 idf.py build
 idf.py -p /dev/ttyACM0 flash
 ```
 
-### First Boot
+### First boot
 
-1. **Receiver** starts in AP mode -- connect to the `TankSync` WiFi network
-2. A captive portal opens automatically (or navigate to `192.168.4.1`)
-3. Configure your home WiFi credentials, MQTT broker, and LoRa settings
-4. **Transmitter** auto-pairs on first boot -- press the "Start Pairing" button in the receiver web UI
+1. **Hub** starts in AP mode → connect to `TankSync-XXXX` WiFi from your phone
+2. Captive portal opens (or visit `192.168.4.1`)
+3. Configure home WiFi + (optional) MQTT broker + LoRa settings
+4. **Transmitter** pairs over the air — hold its `BOOT` button for 2 sec, hub LED turns green when paired
 
-## TankSync Cloud
+## Home Assistant integration
 
-A web dashboard for monitoring your tanks from anywhere. Use the hosted version or self-host your own.
+The hub publishes auto-discovery messages via MQTT — tanks appear automatically as sensor entities. For richer integration (real-time WebSocket push, buzzer entities, sensor-health binary sensors), install the dedicated HACS integration:
 
-**Hosted:** [tanksync.smartghar.org](https://tanksync.smartghar.org) -- sign up, scan the QR code from your receiver's web UI, and your tank data flows to the cloud automatically.
+👉 **[github.com/Techposts/smartghar-homeassistant](https://github.com/Techposts/smartghar-homeassistant)**
 
-**Self-host:**
-```bash
-cd pwa
-npm install
-cp .env.example .env    # Edit with your MQTT broker and API keys
-npm run build
-npm start               # Runs on http://localhost:4800
-```
+## What's NOT in this repo (and why)
 
-Features: multi-tank monitoring, push notifications, QR code device linking, email verification, dark/light themes, historical charts.
+This is the open-source TankSync firmware + hardware mirror. The hosted cloud dashboard (PWA at [tanksync.smartghar.org](https://tanksync.smartghar.org)) is a separate **proprietary** product that adds:
 
-See [pwa/deploy/](pwa/deploy/) for production deployment with systemd and Nginx.
+- Remote access from anywhere (no port forwarding)
+- Push notifications to your phone
+- Multi-tank history + insights
+- QR-code device linking
+- Multi-hub fleet management for societies, farms, hotels
 
-## Home Assistant Integration
+The firmware works fully **without** the cloud — local web UI on the hub gives you tank levels, settings, OTA updates, Home Assistant integration. Cloud is opt-in convenience, never a dependency.
 
-The receiver publishes auto-discovery messages via MQTT. Tanks appear automatically in Home Assistant as sensor entities.
+## Licenses
 
-<p align="center">
-  <img src="docs/images/home-assistant-dashboard.jpg" width="80%" alt="Home Assistant Dashboard" />
-</p>
+| Component | License | What this means |
+|---|---|---|
+| Firmware (`firmware/`) | [AGPL-3.0](LICENSE) | Free for personal + community use. Commercial users who modify and distribute must also open-source their changes under AGPL. |
+| Hardware (`hardware/`) | [CC BY-SA 4.0](hardware/LICENSE) | Attribution + ShareAlike. Build it, sell it, modify it — credit the source and share-alike. |
+| HA Integration | [MIT](https://github.com/Techposts/smartghar-homeassistant/blob/main/LICENSE) (separate repo) | Frictionless for HA ecosystem. |
 
-## Project Structure
-
-```
-firmware/
-  receiver/          ESP32 DevKit receiver (MIT)
-  receiver-c3/       ESP32-C3 receiver variant (MIT)
-  transmitter/       ESP32-C3 transmitter (MIT)
-pwa/
-  server/            Fastify + SQLite server (self-host) (AGPL-3.0)
-  server-cloud/      Fastify + PostgreSQL server (cloud deploy) (AGPL-3.0)
-  client/            React + Tailwind frontend
-  deploy/            Systemd, Nginx, and deploy scripts
-hardware/            BOM and hardware designs (CC BY-SA 4.0)
-docs/                Documentation and images
-.github/workflows/
-  build-firmware.yml  Automated firmware builds on tag push
-  deploy-cloud.yml    CI/CD deploy to DigitalOcean on push
-```
-
-## CI/CD
-
-- **Firmware**: Push a version tag (`git tag v2.2.0 && git push origin v2.2.0`) to auto-build all 3 firmware binaries and create a GitHub Release
-- **Cloud**: Push changes to `pwa/` on main to auto-deploy to the production server via SSH
-
-## LoRa Message Protocol
-
-```
-Transmitter -> Receiver:  TANK:<dist_cm>:<bat_pct>:<bat_v>:<msg_id>:<fw_ver>
-Receiver -> Transmitter:  ACK:<msg_id>
-Config Downlink:          SET:SLEEP=<seconds>:SAMP=<count>
-Pairing:                  PAIR_REQ / PAIR_ACK:<addr>:<name>
-```
-
-## Security
-
-- MQTT over TLS (Let's Encrypt certificates, auto-renewing)
-- Per-user MQTT credentials with topic-level ACL
-- Cloudflare Turnstile captcha on signup
-- Email verification via Resend API
-- Rate limiting on auth endpoints (5 register/min, 10 login/min)
-- JWT tokens with 30-day expiry
-- Security headers (X-Frame-Options, CSP, HSTS via Cloudflare)
-- UFW firewall, fail2ban, SSH key-only deploy
-
-## License
-
-| Component | License | Details |
-|-----------|---------|---------|
-| Firmware (`firmware/`) | [MIT](LICENSE) | Free for any use |
-| Cloud App (`pwa/`) | [AGPL-3.0](pwa/LICENSE) | Must share source if hosted as a service |
-| Hardware (`hardware/`) | [CC BY-SA 4.0](hardware/LICENSE) | Attribution + ShareAlike |
+**Why AGPL on firmware?** It keeps TankSync open for hobbyists and HA users while preventing commercial vendors from repackaging the firmware into a closed product. If you want a non-AGPL commercial license for embedded use, reach out to the maintainer.
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or pull request.
+Issues and PRs welcome. Read the [wiring guide](hardware/wiring.md) before opening hardware-related issues.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+## Author + brand
 
-## Author
+**Ravi Singh** ([@ravis1ngh on YouTube](https://www.youtube.com/@ravis1ngh)) — building open-source home infrastructure in India.
 
-**Ravi Singh** - [YouTube](https://www.youtube.com/@ravis1ngh)
-
-Built with ESP-IDF, React, Fastify, and a lot of late nights.
+**TankSync** is part of the **SmartGhar** ecosystem ([smartghar.org](https://smartghar.org)) — calm, local-first smart-home infrastructure engineered for real-world Indian deployments.
