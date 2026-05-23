@@ -1,0 +1,33 @@
+# TankSync Receiver - ESP32-S3 SuperMini (FH4R2) target overrides.
+# Auto-merged with sdkconfig.defaults when `idf.py set-target esp32s3` runs.
+#
+# CPU is a dual-core Xtensa LX7 at 240 MHz. Embedded 4 MB flash + 2 MB QSPI
+# PSRAM in the same package. Console runs over the native USB-Serial/JTAG
+# (no external USB-UART chip — the S3 has USB peripherals on GPIO19/20).
+
+# Console — native USB-Serial/JTAG (replaces UART0 console on this board).
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# PSRAM — 2 MB embedded quad PSRAM, drives via standard quad SPI.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+
+# Flash mode — S3 SuperMini stock is QIO @ 80 MHz, faster than DevKit's DIO.
+# Falls back gracefully if the board variant is DIO-wired.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# Idle-task WDT check on CPU1 (S3 second core). The common defaults already
+# cover CPU0; this extends watchdog coverage to the app CPU as well.
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
+
+# Wi-Fi RX block-ack window. S3's ESP-IDF default is 16, but the shared
+# defaults pin WIFI_STATIC_RX_BUFFER_NUM=4 and DYNAMIC=8 — both smaller than
+# 16, which trips a compile-time #error in esp_wifi/wifi_init.c. We use the
+# same effective behaviour as ESP32 (BA_WIN=6) so the buffer/window math
+# stays consistent across targets. Raise all three together if a future
+# release demands more Wi-Fi throughput.
+CONFIG_ESP_WIFI_RX_BA_WIN=6

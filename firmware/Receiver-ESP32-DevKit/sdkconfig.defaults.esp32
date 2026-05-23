@@ -1,0 +1,8 @@
+# TankSync Receiver - ESP32 DevKit v1 (CP2102) target overrides.
+# Auto-merged with sdkconfig.defaults when `idf.py set-target esp32` runs.
+#
+# CPU is a dual-core Xtensa LX6 at 240 MHz. UART0 over CP2102 is the console.
+# No PSRAM. Stock 4 MB flash via partitions.csv.
+
+# Console — UART0 via CP2102.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y

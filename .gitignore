@@ -34,10 +34,6 @@ __pycache__/
 
 # Legacy / dev directories (not part of release)
 v2-qr-linking/
-Receiver-ESP32-DevKit/
-Receiver-ESP32-C3/
-Receiver-IDF/
-Transmitter-IDF/
 tanksync-pwa/
 
 # Large binaries (use GitHub Releases instead)
