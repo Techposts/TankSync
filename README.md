@@ -112,6 +112,19 @@ idf.py -p /dev/ttyACM0 flash
 1. **Hub** starts in AP mode → connect to `TankSync-XXXX` WiFi from your phone
 2. Captive portal opens (or visit `192.168.4.1`)
 3. Configure home WiFi + (optional) MQTT broker + LoRa settings
+
+## What you'll use it through
+
+Two surfaces — pick either, or both. They show the same data.
+
+<p align="center">
+  <img src="docs/firmware/screenshots/pwa/dashboard-dark.png" width="38%" alt="TankSync PWA dashboard (phone)" />
+  <img src="docs/firmware/screenshots/webui/tanks-home-glance.png" width="38%" alt="Hub local web UI (any device on the same Wi-Fi)" />
+</p>
+<p align="center">
+  <sub><em>Left: the PWA at <a href="https://tanksync.smartghar.org">tanksync.smartghar.org</a> — works from anywhere. Right: the hub's local web UI — works fully offline. Full walkthrough in the <a href="https://github.com/Techposts/TankSync/wiki">Wiki</a>.</em></sub>
+</p>
+
 4. **Transmitter** pairs over the air — hold its `BOOT` button for 2 sec, hub LED turns green when paired
 
 ## Photos of a real build
