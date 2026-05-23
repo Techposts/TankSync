@@ -1,6 +1,6 @@
 name: Build & Release Firmware
 
-# Triggered when the sync workflow (in the private tanksync-cloud repo)
+# Triggered when the upstream sync workflow
 # pushes a tag here. Per the per-binary tag scheme in RELEASES.md:
 #
 #   rx-v*    → builds firmware/Receiver-ESP32-DevKit/  for ESP32
