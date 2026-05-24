@@ -8,11 +8,12 @@
 **Never worry about your water tank again.** A solar-powered sensor on the rooftop, a quiet hub on the wall, and smart water monitoring that keeps working — even when the internet doesn't. Long-range LoRa (RYLR998) to an ESP32 hub, local web UI, Home Assistant via HACS, optional cloud PWA. Open at the core.
 
 <p align="center">
-  <img src="hardware/photos/pcb-populated-top.jpg" width="45%" alt="Populated TX PCB (open hardware)" />
-  <img src="hardware/photos/case-sensor-mount.jpg" width="45%" alt="BSP-threaded sensor mount installed on a tank lid (current production)" />
+  <img src="hardware/photos/render-hub-wall.png" width="32%" alt="TankSync hub — wall-mounted, live OLED showing 2 tanks, status LEDs for power, WiFi, and cloud" />
+  <img src="hardware/photos/render-sensor-ultrasonic.png" width="32%" alt="TankSync solar tank sensor — side profile with ultrasonic measurement waves visualised" />
+  <img src="hardware/photos/pcb-populated-top.jpg" width="32%" alt="Populated TX PCB — REV 2.2, May 2026 (open hardware)" />
 </p>
 <p align="center">
-  <sub><em>Custom circular TX PCB and current-production PETG enclosure (REV 2.2, May 2026) — tested through Delhi summer at 45°C ambient.</em></sub>
+  <sub><em>The indoor hub (left), the solar tank sensor with non-contact ultrasonic measurement (centre), and the custom circular TX PCB (right) — current production hardware, REV 2.2 (May 2026), tested through Delhi summer at 45°C ambient.</em></sub>
 </p>
 
 ## Try the in-browser flasher first
@@ -130,6 +131,14 @@ Two surfaces — pick either, or both. They show the same data.
 4. **Transmitter** pairs over the air — hold its `BOOT` button for 2 sec, hub LED turns green when paired
 
 ## Photos of a real build
+
+<p align="center">
+  <img src="hardware/photos/render-sensor-mount-iso.png" width="45%" alt="TankSync solar sensor — isometric render showing the BSP-threaded sensor boss + hex lock-nut" />
+  <img src="hardware/photos/render-sensor-solar-top.png" width="45%" alt="TankSync solar sensor — top-down render showing the embedded solar panel" />
+</p>
+<p align="center">
+  <sub><em>Renders of the production sensor — the threaded boss + hex lock-nut secure the sensor through a standard tank-lid hole; the solar panel sits flush on the case top.</em></sub>
+</p>
 
 <p align="center">
   <img src="hardware/photos/pcb-bare-top.jpg" width="30%" alt="Bare PCB, fresh from fab" />
