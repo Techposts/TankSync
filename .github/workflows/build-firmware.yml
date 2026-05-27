@@ -73,8 +73,22 @@ jobs:
 
       - name: Read tag annotation as release body
         id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BODY=$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}")
+          # Read annotation via GitHub REST API instead of `git tag -l --format`.
+          # actions/checkout@v4 with fetch-depth:0 sometimes leaves annotated tags
+          # as lightweight refs locally, in which case %(contents) returns the
+          # commit subject (e.g. "sync(rx): rx-v2.8.6") instead of the annotated
+          # body. The REST API path always returns the true annotation message.
+          OBJ_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${GITHUB_REF_NAME}" --jq '.object.sha')
+          OBJ_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${GITHUB_REF_NAME}" --jq '.object.type')
+          if [ "$OBJ_TYPE" = "tag" ]; then
+            BODY=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJ_SHA}" --jq '.message')
+          else
+            # Lightweight tag — fall back to the commit subject so we don't fail.
+            BODY=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${OBJ_SHA}" --jq '.message')
+          fi
           {
             echo "body<<__END_OF_BODY__"
             echo "$BODY"
