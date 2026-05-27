@@ -15,10 +15,12 @@
 
 #include "config.h"
 #include "sensor_sr04.h"
+#include "sensor_iface.h"
 #include "battery_monitor.h"
 #include "lora_tx.h"
 #include "wifi_ota.h"
 #include "led_ws2812.h"
+#include "log_buffer.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -52,17 +54,75 @@ static const uint32_t TS_BUILD_FP = 0xA3F1D582u;
 #define SEND_STR(s)  lora_tx_send_raw((s), strlen(s))
 #define CLAMP(x, lo, hi)  ((x) < (lo) ? (lo) : ((x) > (hi) ? (hi) : (x)))
 
-// Low-battery threshold — skip TX and extend sleep to protect LiPo
-#define BAT_CUTOFF_MV  3100
-#define BAT_CUTOFF_SLEEP_S  3600  // 1 hour
+// Low-battery thresholds (INA219 bus-voltage, mV):
+//   ≥ BAT_LOW_TX_MV  → normal TX
+//   < BAT_LOW_TX_MV  → skip TX this cycle, extended sleep (preserves charge,
+//                       prevents brown-out loop from a battery that still has
+//                       static voltage but can't deliver the LoRa-burst current)
+//   < BAT_CUTOFF_MV  → hibernate, protect LiPo from over-discharge
+#define BAT_CUTOFF_MV       3100
+#define BAT_LOW_TX_MV       3300
+#define BAT_CUTOFF_SLEEP_S  3600    // 1 hour
+#define BAT_LOW_TX_SLEEP_S  600     // 10 min — give battery time to recover
 
 // OTA total timeout — prevent staying awake indefinitely on stalled OTA
 #define OTA_TOTAL_TIMEOUT_MS  (5 * 60 * 1000)  // 5 minutes
 
-// ── RTC memory (survives deep sleep) ─────────────────────────────────────────
+// Brown-out / watchdog backoff — exponential, capped at 1h.
+// streak=1 → 60s, =2 → 120s, =3 → 240s, =4 → 480s, =5 → 960s, =6 → 1920s,
+// streak>=7 clamped to 3600s. Streak clears on next successful ACK.
+#define BROWNOUT_BASE_SLEEP_S  60
+#define BROWNOUT_MAX_SLEEP_S   3600
+
+// ── RTC memory (survives deep sleep AND brown-out reset) ─────────────────────
+// RTC_DATA_ATTR survives deep-sleep + most resets but NOT power-cycle. That's
+// exactly what we want for the brown-out streak: counter persists across the
+// brown-out → reboot cycle so we can back off, but a clean power-cycle starts
+// fresh.
 RTC_DATA_ATTR static uint32_t s_msg_id    = 0;
 RTC_DATA_ATTR static uint32_t s_boot_count = 0;
 RTC_DATA_ATTR static uint32_t s_ack_failures = 0;
+RTC_DATA_ATTR static uint32_t s_brownout_streak = 0;
+
+// ── Reset-reason helpers ────────────────────────────────────────────────────
+// esp_sleep_get_wakeup_cause() only reflects DEEP-SLEEP wake causes. A brown-
+// out reset returns ESP_SLEEP_WAKEUP_UNDEFINED, identical to a fresh power-on
+// — so we MUST also call esp_reset_reason() to tell them apart. Without this
+// distinction, the boot-window check at the bottom of app_main treats a
+// brown-out the same as a user pressing reset (10s boot window, then sensor
+// + LoRa TX → another brown-out → loop forever, burning battery instead of
+// sleeping). This is the root cause of the "TX sometimes sleeps, sometimes
+// loops forever" symptom — diagnosed 2026-05-25.
+static const char *reset_reason_str(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_POWERON:   return "POWERON";
+        case ESP_RST_EXT:       return "EXT";
+        case ESP_RST_SW:        return "SW";
+        case ESP_RST_PANIC:     return "PANIC";
+        case ESP_RST_INT_WDT:   return "INT_WDT";
+        case ESP_RST_TASK_WDT:  return "TASK_WDT";
+        case ESP_RST_WDT:       return "WDT";
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT:  return "BROWNOUT";
+        case ESP_RST_SDIO:      return "SDIO";
+        default:                return "UNKNOWN";
+    }
+}
+
+// Forward decl — defined below.
+static inline void ws2812_quiet_for_sleep(void);
+
+// Go to deep sleep for N seconds without doing any other work. Used by the
+// brown-out backoff and low-battery paths to skip the sensor + LoRa TX cycle
+// entirely (which is what was causing the brown-out in the first place).
+// Always quiets the WS2812 first so the LED doesn't stay latched on through
+// sleep — also a visual confirmation that the chip is actually sleeping.
+static void deep_sleep_for(uint32_t seconds, const char *reason) {
+    ESP_LOGW("main", "Backoff sleep %lus (%s)", (unsigned long)seconds, reason);
+    esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
+    ws2812_quiet_for_sleep();
+    esp_deep_sleep_start();
+}
 
 // ── Sensor diagnostic loop v2 (only built when SENSOR_DIAG_MODE == 1) ───────
 // Targeted at the "works on Arduino, fails on ESP-IDF" failure pattern. The
@@ -393,9 +453,12 @@ static void handle_downlink(void) {
                 char *payload = strstr(line, "SET:");
                 if (payload) {
                     ESP_LOGI(TAG, "CONFIG: %s", payload);
-                    char *s_sleep = strstr(payload, "SLEEP=");
-                    char *s_samp  = strstr(payload, "SAMP=");
-                    char *s_pwr   = strstr(payload, "PWR=");
+                    char *s_sleep  = strstr(payload, "SLEEP=");
+                    char *s_samp   = strstr(payload, "SAMP=");
+                    char *s_pwr    = strstr(payload, "PWR=");
+                    // SENSOR=sr04|ld2413 (added rx-v2.8.6 / tx-v2.0.15). Legacy
+                    // RX firmwares omit this token — TX keeps current driver.
+                    char *s_sensor = strstr(payload, "SENSOR=");
                     nvs_handle_t h;
                     if (nvs_open(NVS_NS_SYSTEM, NVS_READWRITE, &h) == ESP_OK) {
                         if (s_sleep) {
@@ -405,6 +468,28 @@ static void handle_downlink(void) {
                         if (s_samp) {
                             uint8_t val = CLAMP(atoi(s_samp + 5), 3, 20);
                             nvs_set_u8(h, "samples", val);
+                        }
+                        if (s_sensor) {
+                            // Read up to the next field separator. The full RYLR998 line
+                            // shape is "+RCV=<addr>,<len>,SET:...:SENSOR=sr04,<rssi>,<snr>"
+                            // so we MUST stop at ',' (rssi follows). Numeric tokens
+                            // (SLEEP=, SAMP=, PWR=) use atoi which is comma-safe, but
+                            // SENSOR= is a string and gets bitten without this. Cap at
+                            // 11 chars to match the sensor_kind buffer on the RX side.
+                            char kind[12] = {0};
+                            const char *src = s_sensor + 7;
+                            for (int i = 0; i < (int)sizeof(kind) - 1
+                                            && src[i]
+                                            && src[i] != ':' && src[i] != ','
+                                            && src[i] != '\r' && src[i] != '\n'; i++) {
+                                kind[i] = src[i];
+                            }
+                            if (strcmp(kind, "sr04") == 0 || strcmp(kind, "ld2413") == 0) {
+                                nvs_set_str(h, "sensor_kind", kind);
+                                ESP_LOGI(TAG, "CONFIG: sensor_kind set to '%s' (driver loads after reboot)", kind);
+                            } else {
+                                ESP_LOGW(TAG, "CONFIG: ignoring unknown SENSOR='%s'", kind);
+                            }
                         }
                         nvs_commit(h); nvs_close(h);
                     }
@@ -563,11 +648,69 @@ static void handle_downlink(void) {
 
 // ── app_main ─────────────────────────────────────────────────────────────────
 void app_main(void) {
+    // Install the log ring buffer FIRST — before any other ESP_LOGI calls so
+    // even the boot-time logs are captured. The web UI reads from this ring
+    // via /api/logs to give Tasmota-style live console output without
+    // requiring a USB cable.
+    log_buffer_init();
+
     s_boot_count++;
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    esp_reset_reason_t reset_reason = esp_reset_reason();
 
-    ESP_LOGI(TAG, "TankSync TX v%s boot #%" PRIu32 " (wakeup: %d, build %08X)",
-             FIRMWARE_VERSION, s_boot_count, (int)cause, (unsigned)TS_BUILD_FP);
+    ESP_LOGI(TAG, "TankSync TX v%s boot #%" PRIu32 " wakeup=%d reset=%s brownout_streak=%" PRIu32 " (build %08X)",
+             FIRMWARE_VERSION, s_boot_count, (int)cause,
+             reset_reason_str(reset_reason),
+             s_brownout_streak, (unsigned)TS_BUILD_FP);
+
+    // ── INVOLUNTARY RESET HANDLER ────────────────────────────────────────────
+    // Brown-out / watchdog / panic = something broke during the previous wake
+    // cycle. Repeating the same cycle immediately is what creates the loop
+    // the user sees: LoRa TX → voltage sag → BOD trip → reset → 10s boot
+    // window → LoRa TX → trip again → ...
+    //
+    // Instead: increment a persistent streak counter, deep-sleep with
+    // exponential backoff, and skip ALL peripheral init for this wake. The
+    // longer sleep lets the battery recover (LiPo terminal voltage rises
+    // significantly when load is removed). Streak resets on the next
+    // successful LoRa ACK so a clean recovery cycle returns to normal cadence.
+    bool involuntary = (reset_reason == ESP_RST_BROWNOUT  ||
+                        reset_reason == ESP_RST_WDT       ||
+                        reset_reason == ESP_RST_INT_WDT   ||
+                        reset_reason == ESP_RST_TASK_WDT  ||
+                        reset_reason == ESP_RST_PANIC);
+
+    if (involuntary) {
+        s_brownout_streak++;
+
+        // backoff = BROWNOUT_BASE_SLEEP_S * 2^(streak-1), capped.
+        // Clamp shift to keep arithmetic safe even on a wedged streak counter.
+        uint32_t shift = s_brownout_streak - 1;
+        if (shift > 16) shift = 16;
+        uint64_t backoff = (uint64_t)BROWNOUT_BASE_SLEEP_S << shift;
+        if (backoff > BROWNOUT_MAX_SLEEP_S) backoff = BROWNOUT_MAX_SLEEP_S;
+
+        ESP_LOGW(TAG, "Involuntary reset (%s) — streak=%" PRIu32 ", backing off %" PRIu64 "s",
+                 reset_reason_str(reset_reason), s_brownout_streak, backoff);
+
+        // Init the +5V gate as OUTPUT-LOW and the WS2812 line as OUTPUT-LOW
+        // before sleeping. We can't safely run ws2812_quiet_for_sleep() which
+        // tries to talk to LoRa + INA219 — those peripherals may be in an
+        // unknown state mid-reset. Manual minimal quiet:
+        gpio_reset_pin(PIN_5V_GATE);
+        gpio_set_direction(PIN_5V_GATE, GPIO_MODE_OUTPUT);
+        gpio_set_level(PIN_5V_GATE, 0);
+        gpio_hold_en(PIN_5V_GATE);
+        gpio_reset_pin(PIN_WS2812);
+        gpio_set_direction(PIN_WS2812, GPIO_MODE_OUTPUT);
+        gpio_set_level(PIN_WS2812, 0);
+        gpio_hold_en(PIN_WS2812);
+        gpio_deep_sleep_hold_en();
+
+        esp_sleep_enable_timer_wakeup(backoff * 1000000ULL);
+        esp_deep_sleep_start();
+        // never returns
+    }
 
 #if SENSOR_DIAG_MODE
     // Diagnostic firmware: don't touch LoRa, deep sleep, OTA, power mgmt.
@@ -646,20 +789,74 @@ void app_main(void) {
         nvs_flash_init();
     }
 
-    // Load custom sleep/sample intervals
+    // ── 2a. Diagnostic mode check ──
+    // If the user enabled diag mode via the web UI, NVS has system/diag_mode=1.
+    // In that case we skip the entire normal sensor→LoRa→sleep cycle and jump
+    // straight into the WiFi OTA web server so the user can watch logs and
+    // tweak the TX without it deep-sleeping out from under them. The web UI's
+    // "Disable diagnostic mode" button flips the flag back and reboots.
+    //
+    // 30-minute auto-off safety net: the wifi_ota_start path will check uptime
+    // and auto-disable diag_mode if the TX has been awake too long, so a user
+    // who forgets won't drain a deployed battery overnight.
+    {
+        nvs_handle_t h;
+        uint8_t diag_mode = 0;
+        if (nvs_open(NVS_NS_SYSTEM, NVS_READONLY, &h) == ESP_OK) {
+            nvs_get_u8(h, "diag_mode", &diag_mode);
+            nvs_close(h);
+        }
+        if (diag_mode) {
+            ESP_LOGW(TAG, "Diagnostic mode active — entering WiFi OTA (no deep sleep)");
+            uint16_t addr = 0;
+            if (nvs_open("lora", NVS_READONLY, &h) == ESP_OK) {
+                nvs_get_u16(h, "addr", &addr);
+                nvs_close(h);
+            }
+            wifi_ota_start(PIN_LED, addr);  // never returns
+        }
+    }
+
+    // Load custom sleep/sample intervals + sensor kind
     uint32_t sleep_s = SLEEP_INTERVAL_S;
     uint8_t  samples = SENSOR_SAMPLES;
+    char     sensor_kind[16] = "sr04";   // default if NVS unset
     {
         nvs_handle_t h;
         if (nvs_open(NVS_NS_SYSTEM, NVS_READONLY, &h) == ESP_OK) {
             nvs_get_u32(h, "sleep_s", &sleep_s);
             nvs_get_u8(h, "samples", &samples);
+            size_t klen = sizeof(sensor_kind);
+            nvs_get_str(h, "sensor_kind", sensor_kind, &klen);  // leaves "sr04" if absent
             nvs_close(h);
         }
     }
 
+    // ── Resolve sensor vtable ────────────────────────────────────────────────
+    // Driver-internal pin / power / range knowledge lives in each driver.
+    // main.c stays sensor-agnostic from here on, calling iface->init() and
+    // iface->read_cm() rather than the SR04-specific symbols directly.
+    sensor_iface_sr04_set_pins(PIN_TRIG, PIN_ECHO);
+    // LD2413 shares the same physical pins (GPIO4/5) — pin directions match by
+    // chance between SR04 trig/echo and LD2413 UART TX/RX. UART0 is free
+    // (LoRa owns UART1 — see LORA_UART_NUM in config.h).
+    sensor_iface_ld2413_set_uart(0, PIN_TRIG, PIN_ECHO);
+    const sensor_iface_t *iface = sensor_get(sensor_kind);
+    if (!iface) {
+        ESP_LOGW(TAG, "Unknown sensor_kind='%s' in NVS — falling back to default", sensor_kind);
+        iface = sensor_get_default();
+    }
+    ESP_LOGI(TAG, "Sensor: %s (range %d-%d cm, warmup %lums)",
+             iface->name, iface->min_cm(), iface->max_cm(),
+             (unsigned long)iface->warmup_ms());
+
     // ── 3. LoRa init ──
     lora_tx_set_firmware_version(FIRMWARE_VERSION);
+    // Tell the LoRa driver which sensor we're actually running so it can
+    // include the kind as the 11th TANK field. RX uses this for "active vs
+    // queued" reconciliation. Falls back to the iface's vtable name when the
+    // sensor_kind NVS string is empty (e.g. just paired, never configured).
+    lora_tx_set_sensor_kind(sensor_kind[0] ? sensor_kind : iface->name);
     lora_tx_init(LORA_UART_NUM, PIN_LORA_TX, PIN_LORA_RX, LORA_BAUD);
     // If the previous sleep cycle put RYLR998 into AT+MODE=1, this wakes it
     // back to MODE=0 by sending a dummy byte, draining the discard byte,
@@ -670,8 +867,16 @@ void app_main(void) {
     lora_tx_get_config(&lora_cfg);
 
     // ── 4. Boot window — SKIP on timer wake for battery savings (audit #17) ──
-    // Only enter on power-on reset or manual reset, not on deep sleep timer wake.
-    bool enter_boot_window = (cause != ESP_SLEEP_WAKEUP_TIMER);
+    // Open boot window ONLY for user-initiated resets:
+    //   POWERON = first plug-in, EXT = reset button pressed, SW = esp_restart()
+    //   after a config push from RX (so the new settings are visible in logs).
+    // Brown-out / WDT / panic were already handled at top of app_main and
+    // never reach here, but we still require an explicit user-reset reason
+    // here as a defense-in-depth check.
+    bool user_reset = (reset_reason == ESP_RST_POWERON ||
+                       reset_reason == ESP_RST_EXT     ||
+                       reset_reason == ESP_RST_SW);
+    bool enter_boot_window = (cause != ESP_SLEEP_WAKEUP_TIMER) && user_reset;
 
     if (enter_boot_window) {
         ESP_LOGI(TAG, "Boot window (10s). Hold BOOT: 2s+release=PAIR | 5s=WiFi UPDATE");
@@ -783,9 +988,9 @@ void app_main(void) {
     ws2812_pulse(LED_AMBER, 150);
 
     // ── 5. Read sensors ──
-    sensor_init(PIN_TRIG, PIN_ECHO);
+    iface->init();
     int dist_cm = -1;
-    esp_err_t sensor_err = sensor_read_cm(&dist_cm);
+    esp_err_t sensor_err = iface->read_cm(&dist_cm);
     char sensor_status = (sensor_err == ESP_OK && dist_cm > 0) ? 'o' : 'e';
     if (sensor_status == 'e') {
         ESP_LOGW(TAG, "Sensor read failed (err=0x%x, dist=%d) — TX will mark status='e' so RX can preserve last-known reading", sensor_err, dist_cm);
@@ -802,15 +1007,46 @@ void app_main(void) {
              (long)pr.current_ma, (long)pr.power_mw,
              pr.charging ? "CHARGING" : "discharging");
 
-    // ── 6. Low battery cutoff (audit #13) ──
-    // Disabled for now — ADC reads noise (500-2800mV) without a real battery,
-    // which falsely triggers cutoff. TODO: enable when battery is calibrated.
-    if (false && bat_mv < BAT_CUTOFF_MV && bat_mv > 2500) {
-        ESP_LOGW(TAG, "Low battery %" PRIu32 "mV — extended sleep %ds", bat_mv, BAT_CUTOFF_SLEEP_S);
-        led_flash(PIN_LED, 50, 10);  // rapid flash = low battery warning
-        esp_sleep_enable_timer_wakeup((uint64_t)BAT_CUTOFF_SLEEP_S * 1000000ULL);
-        ws2812_quiet_for_sleep();
-        esp_deep_sleep_start();
+    // ── 6. Battery-voltage gate (INA219 only — ADC path was removed 2026-05-16) ──
+    // Two thresholds, both depending on a TRUSTWORTHY voltage reading.
+    //
+    // SANITY FLOOR — bat_mv must be > BAT_PRESENT_MIN_MV before we apply any
+    // cutoff. A real LiPo never reads below ~2.0V even after irreversible
+    // damage; anything lower means the INA219 is reporting garbage (no
+    // battery in the circuit, USB-only bench, faulty wiring). Acting on
+    // bogus readings caused tx-v2.0.15 to hibernate dev hardware on first
+    // boot — bench TX with no battery reads vbat=36mV which would otherwise
+    // trip BAT_CUTOFF immediately. Below the floor we log + skip the gate.
+    //
+    //   < BAT_CUTOFF_MV  → hibernate 1h. LiPo at this voltage is being
+    //                      damaged by further discharge; transmit cycles
+    //                      will brown out and waste what little charge
+    //                      remains. Long sleep is the only safe action.
+    //
+    //   < BAT_LOW_TX_MV  → skip TX this cycle, sleep 10 min. Battery still
+    //                      has some charge but rest voltage is already low
+    //                      enough that the 22 dBm LoRa burst will likely
+    //                      sag the rail past the C3's BOD level. Skipping
+    //                      one cycle preserves the ability to send a final
+    //                      warning packet later when voltage recovers
+    //                      (LiPo terminal voltage rises after rest).
+    #define BAT_PRESENT_MIN_MV  1000
+    if (pr.mode == POWER_MODE_INA219 && bat_mv > BAT_PRESENT_MIN_MV) {
+        if (bat_mv < BAT_CUTOFF_MV) {
+            ESP_LOGW(TAG, "BAT CRITICAL %" PRIu32 "mV — hibernating %ds",
+                     bat_mv, BAT_CUTOFF_SLEEP_S);
+            led_flash(PIN_LED, 50, 10);    // rapid flash = critical
+            deep_sleep_for(BAT_CUTOFF_SLEEP_S, "bat_critical");
+        }
+        if (bat_mv < BAT_LOW_TX_MV) {
+            ESP_LOGW(TAG, "BAT LOW %" PRIu32 "mV — skip TX, sleeping %ds",
+                     bat_mv, BAT_LOW_TX_SLEEP_S);
+            led_flash(PIN_LED, 100, 3);    // 3 slow blinks = battery low warning
+            deep_sleep_for(BAT_LOW_TX_SLEEP_S, "bat_low");
+        }
+    } else if (pr.mode == POWER_MODE_INA219 && bat_mv <= BAT_PRESENT_MIN_MV) {
+        ESP_LOGW(TAG, "INA219 vbat=%" PRIu32 "mV looks like no battery / bench USB — skipping cutoff",
+                 bat_mv);
     }
 
     // ── 7. Send TANK packet ──
@@ -827,6 +1063,15 @@ void app_main(void) {
 
     if (acked) {
         s_ack_failures = 0;
+        // Successful TX → the brown-out chain (if any) is broken. Reset the
+        // streak so we go back to the configured sleep cadence instead of
+        // the exponential-backoff schedule. If the next cycle browns out
+        // again, the streak rebuilds from 1.
+        if (s_brownout_streak != 0) {
+            ESP_LOGI(TAG, "Brown-out streak cleared after successful ACK (was %" PRIu32 ")",
+                     s_brownout_streak);
+            s_brownout_streak = 0;
+        }
         led_flash(PIN_LED, 80, 2);
         handle_downlink();
     } else {

@@ -4,6 +4,7 @@ idf_component_register(
     REQUIRES
         tanksync_version
         lora_rylr998
+        log_buffer
         transmitter_registry
         wifi_manager
         web_server

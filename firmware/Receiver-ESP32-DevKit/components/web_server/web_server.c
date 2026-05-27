@@ -11,6 +11,7 @@
 #include "led_ws2812.h"
 #include "geo_time.h"
 #include "buzzer.h"
+#include "log_buffer.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -339,9 +340,12 @@ static const char DASHBOARD_HTML[] =
 "<div class='field'><span class='lbl'>Tank name</span><input type='text' id='tx-name' class='serifish' maxlength='24'><span class='help'>Up to twenty-four letters; OLED trims long names to fit.</span></div>\n"
 "<div class='field'><span class='lbl'>Capacity</span><div class='is'><input type='number' id='tx-cap'><span class='sf'>litres</span></div><span class='help'>Total volume when full.</span></div>\n"
 "</div>\n"
+"<div class='field-row c1'>\n"
+"<div class='field'><span class='lbl'>Sensor</span><select id='tx-sensor'><option value=''>Keep current</option><option value='sr04'>Ultrasonic \u2014 AJ-SR04M (0.05\u20134\u202fm)</option><option value='ld2413'>mmWave \u2014 HLK-LD2413 (0.15\u201310.5\u202fm) \u00b7 experimental</option></select><span class='help'>Distance-sensor module fitted to this transmitter. Sent on next wake; TX reboots to load the new driver.</span></div>\n"
+"</div>\n"
 "<div class='field-row c2'>\n"
 "<div class='field'><span class='lbl'>Distance \u00b7 when full</span><div class='is'><input type='number' class='mi' id='tx-min'><span class='sf'>cm</span></div><span class='help'>Sensor \u2192 water surface when brimming.</span></div>\n"
-"<div class='field'><span class='lbl'>Distance \u00b7 when empty</span><div class='is'><input type='number' class='mi' id='tx-max'><span class='sf'>cm</span></div><span class='help'>Sensor \u2192 bottom (or your minimum line).</span></div>\n"
+"<div class='field'><span class='lbl'>Distance \u00b7 when empty</span><div class='is'><input type='number' class='mi' id='tx-max'><span class='sf'>cm</span></div><span class='help'>Sensor \u2192 bottom (or your minimum line). Range widens to 1050\u202fcm for mmWave.</span></div>\n"
 "</div>\n"
 "<div class='field-row c3'>\n"
 "<div class='field'><span class='lbl'>Sleep interval</span><div class='is'><input type='number' class='mi' id='tx-sleep' min='60' max='86400'><span class='sf'>sec</span></div><span class='help'>60 seconds to a day. Longer = longer battery.</span></div>\n"
@@ -891,12 +895,17 @@ static const char DASHBOARD_HTML[] =
 "const d=await api('/api/transmitters');const tb=$('#tx-tbody');if(!tb)return;\n"
 "$('#dCount').textContent=d.transmitters&&d.transmitters.length?`\u2014 ${numToWord(d.transmitters.length).toLowerCase()} paired with this Hub.`:'';\n"
 "if(!d.transmitters||!d.transmitters.length){tb.innerHTML=`<tr><td colspan='10' style='text-align:center;color:var(--ink3);padding:24px;font-style:italic;font-family:var(--serif)'>No transmitters paired yet.</td></tr>`;return}\n"
-"tb.innerHTML=d.transmitters.map(t=>{const fw=t.fw_version&&t.fw_version!=='unknown'?'v'+escapeHTML(t.fw_version):'<span class=\"help\">—</span>';const stateChip=t.pending_config?escapeHTML(t.state)+' <span class=\"pending-chip\">queued</span>':escapeHTML(t.state);return `<tr><td class='n'>${t.address}</td><td>${escapeHTML(t.name)}</td><td class='n'>${t.min_dist}</td><td class='n'>${t.max_dist}</td><td class='n'>${t.capacity}</td><td class='n'>${t.sleep}s</td><td class='n'>${t.samples}</td><td class='n'>${t.lora_pwr||0}</td><td class='n' style='font-family:var(--mono);font-size:12px'>${fw}</td><td>${stateChip}</td><td><button class='btn sm' onclick='identifyTx(${t.address})' title='Blink this tank LED'>Identify</button> <button class='btn sm' data-edit='${t.address}' onclick='editTx(${t.address},${JSON.stringify(t.name)},${t.min_dist},${t.max_dist},${t.capacity},${t.sleep},${t.samples},${t.lora_pwr||0})'>Edit</button></td></tr>`}).join('');\n"
+"tb.innerHTML=d.transmitters.map(t=>{const fw=t.fw_version&&t.fw_version!=='unknown'?'v'+escapeHTML(t.fw_version):'<span class=\"help\">—</span>';const stateChip=t.pending_config?escapeHTML(t.state)+' <span class=\"pending-chip\">queued</span>':escapeHTML(t.state);return `<tr><td class='n'>${t.address}</td><td>${escapeHTML(t.name)}</td><td class='n'>${t.min_dist}</td><td class='n'>${t.max_dist}</td><td class='n'>${t.capacity}</td><td class='n'>${t.sleep}s</td><td class='n'>${t.samples}</td><td class='n'>${t.lora_pwr||0}</td><td class='n' style='font-family:var(--mono);font-size:12px'>${fw}</td><td>${stateChip}</td><td><button class='btn sm' onclick='identifyTx(${t.address})' title='Blink this tank LED'>Identify</button> <button class='btn sm' data-edit='${t.address}' onclick='editTx(${t.address},${JSON.stringify(t.name)},${t.min_dist},${t.max_dist},${t.capacity},${t.sleep},${t.samples},${t.lora_pwr||0},${JSON.stringify(t.sensor_kind||\"\")})'>Edit</button></td></tr>`}).join('');\n"
 "}\n"
 "async function identifyTx(addr){try{const r=await api('/api/v1/devices/'+addr+'/identify',{method:'POST'});if(r.ok===false)showToast(r.message||'Identify failed',false);else showToast('Tank LED blinking')}catch(e){showToast('Identify failed: '+e.message,false)}}\n"
 "let _ea=0;\n"
-"function editTx(a,n,mn,mx,c,s,sa,pw){_ea=a;$('#tx-addr').value=a;$('#tx-addr-display').textContent='\u2116 '+a+' \u00b7 '+n;$('#tx-name').value=n;$('#tx-min').value=mn;$('#tx-max').value=mx;$('#tx-cap').value=c;$('#tx-sleep').value=s;$('#tx-samp').value=sa;$('#tx-pwr').value=pw||0;window.scrollTo({top:0,behavior:'smooth'})}\n"
-"async function saveTx(){const addr=_ea||+$('#tx-addr').value;if(!addr||addr<1){showToast('Invalid address',false);return}const sleep=+$('#tx-sleep').value;const samp=+$('#tx-samp').value;const mn=+$('#tx-min').value;const mx=+$('#tx-max').value;const pwrR=+$('#tx-pwr').value;const pwr=(isNaN(pwrR)||pwrR<=0)?0:Math.min(22,Math.max(1,pwrR));if(mn>=mx){showToast('Distance when full must be less than empty',false);return}if(sleep<60){showToast('Sleep must be \u2265 60 seconds',false);return}if(samp<3||samp>20){showToast('Samples must be 3\u201320',false);return}const b={addr:addr,name:$('#tx-name').value,min_dist:mn,max_dist:mx,capacity:+$('#tx-cap').value,sleep:sleep,samples:samp,lora_pwr:pwr};const r=await api('/api/transmitters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});showToast(r.ok===false?(r.message||'Error'):(sleep>=60?'Saved \u00b7 TX config queued':'Saved'),r.ok!==false);loadTransmitters();}\n"
+"function editTx(a,n,mn,mx,c,s,sa,pw,sk){_ea=a;$('#tx-addr').value=a;$('#tx-addr-display').textContent='\u2116 '+a+' \u00b7 '+n;$('#tx-name').value=n;$('#tx-min').value=mn;$('#tx-max').value=mx;$('#tx-cap').value=c;$('#tx-sleep').value=s;$('#tx-samp').value=sa;$('#tx-pwr').value=pw||0;$('#tx-sensor').value=sk||'';txSensorClamp();window.scrollTo({top:0,behavior:'smooth'})}\n"
+// Widen the empty-distance max clamp based on the selected sensor envelope
+// (SR04M caps at 400 cm; LD2413 reaches 1050 cm). 'Keep current' uses the
+// permissive ceiling so users with an already-paired LD2413 can still edit.
+"function txSensorClamp(){const sel=$('#tx-sensor');const sk=sel?sel.value:'';const mx=$('#tx-max');if(!mx)return;mx.max=(sk==='sr04')?400:1050;mx.title=(sk==='sr04')?'Max 400 cm (ultrasonic)':(sk==='ld2413'?'Max 1050 cm (mmWave)':'Max 1050 cm (sensor not changed)');}\n"
+"document.addEventListener('change',e=>{if(e.target&&e.target.id==='tx-sensor')txSensorClamp();});\n"
+"async function saveTx(){const addr=_ea||+$('#tx-addr').value;if(!addr||addr<1){showToast('Invalid address',false);return}const sleep=+$('#tx-sleep').value;const samp=+$('#tx-samp').value;const mn=+$('#tx-min').value;const mx=+$('#tx-max').value;const pwrR=+$('#tx-pwr').value;const pwr=(isNaN(pwrR)||pwrR<=0)?0:Math.min(22,Math.max(1,pwrR));const sk=$('#tx-sensor').value;if(mn>=mx){showToast('Distance when full must be less than empty',false);return}if(sleep<60){showToast('Sleep must be \u2265 60 seconds',false);return}if(samp<3||samp>20){showToast('Samples must be 3\u201320',false);return}if(sk==='ld2413'&&!confirm('Switch this transmitter to mmWave (LD2413)?\\n\\nThe LD2413 driver is built from the datasheet and has not been bench-verified. The TX will reboot on its next wake to load the new driver.'))return;const b={addr:addr,name:$('#tx-name').value,min_dist:mn,max_dist:mx,capacity:+$('#tx-cap').value,sleep:sleep,samples:samp,lora_pwr:pwr};if(sk)b.sensor_kind=sk;const r=await api('/api/transmitters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});showToast(r.ok===false?(r.message||'Error'):(sleep>=60?'Saved \u00b7 TX config queued':'Saved'),r.ok!==false);loadTransmitters();}\n"
 "async function clearAllTx(){if(confirm('Remove all paired devices?')){const r=await api('/api/transmitters/clear?confirm=1',{method:'POST'});showToast(r.ok===false?(r.message||'Failed'):'Cleared',r.ok!==false);loadTransmitters();}}\n"
 "async function factoryReset(){const a=prompt('Factory reset wipes EVERYTHING:\\n  - Wi-Fi credentials\\n  - MQTT cloud link\\n  - All paired tanks + tombstones\\n  - All history\\n  - LoRa NETID\\n\\nThe hub will reboot into setup AP mode.\\n\\nType ERASE to confirm:');if(a!=='ERASE')return;try{const r=await fetch('/api/factory_reset?confirm=YES_ERASE_EVERYTHING',{method:'POST'});const j=await r.json();showToast(j.ok===false?(j.message||'Failed'):'Wiping & rebooting...',j.ok!==false);}catch(e){showToast('Reset triggered (connection dropped)',true);}}\n"
 "function pairUpdateRing(secLeft){const r=603.19;const f=$('#pair-fill');const pct=Math.max(0,Math.min(1,(60-secLeft)/60));f.setAttribute('stroke-dashoffset',r*(1-pct))}\n"
@@ -1256,7 +1265,9 @@ static cJSON *build_v1_device_obj(int idx) {
     cJSON_AddNumberToObject(config, "capacity_l",  info.capacity_liters);
     cJSON_AddNumberToObject(config, "min_dist_cm", info.min_dist_cm);
     cJSON_AddNumberToObject(config, "max_dist_cm", info.max_dist_cm);
-    cJSON_AddStringToObject(config, "sensor_kind", "ultrasonic");
+    // sensor_kind sourced from the registry — falls back to empty string for
+    // legacy entries that never had it queued (TX firmware then defaults SR04).
+    cJSON_AddStringToObject(config, "sensor_kind", info.sensor_kind[0] ? info.sensor_kind : "sr04");
     cJSON_AddNumberToObject(config, "sleep_s",     info.sleep_s);
     cJSON_AddNumberToObject(config, "samples",     info.samples);
     cJSON_AddBoolToObject  (config, "pending_config", info.pending_config);
@@ -1464,6 +1475,14 @@ static esp_err_t handle_get_transmitters(httpd_req_t *req) {
         cJSON_AddNumberToObject(t, "sleep",      info.sleep_s);
         cJSON_AddNumberToObject(t, "samples",    info.samples);
         cJSON_AddNumberToObject(t, "lora_pwr",   info.lora_pwr);
+        // sensor_kind — what the RX last QUEUED for this tank via SET frame.
+        // Empty string means no preference recorded (legacy entries / never
+        // configured by the user). UI falls back to "sr04" in the dropdown.
+        cJSON_AddStringToObject(t, "sensor_kind", info.sensor_kind);
+        // active_sensor — what the TX is ACTUALLY running, reported by it in
+        // the last TANK packet (since TX v2.0.15). Empty if the TX firmware
+        // doesn't include the field. UI shows Active vs Queued for drift.
+        cJSON_AddStringToObject(t, "active_sensor", data.active_sensor);
         cJSON_AddBoolToObject  (t, "pending_config", info.pending_config);
         cJSON_AddStringToObject(t, "state",      registry_state_str(data.state));
         cJSON_AddStringToObject(t, "fw_version", data.fw_version[0] ? data.fw_version : "unknown");
@@ -1504,6 +1523,11 @@ static esp_err_t handle_post_transmitters(httpd_req_t *req) {
     cJSON *pwr_j = cJSON_GetObjectItem(j, "lora_pwr");
     uint8_t pwr = pwr_j ? (uint8_t)cJSON_GetNumberValue(pwr_j) : 0;
     if (pwr > 22) pwr = 22;   // RYLR998 max
+    // Optional sensor_kind ("sr04" | "ld2413"). Absent = leave at whatever the
+    // TX currently has. Validation happens in registry_set_sensor_kind below.
+    const char *sensor_ptr = cJSON_GetStringValue(cJSON_GetObjectItem(j, "sensor_kind"));
+    char sensor_buf[12] = {0};
+    if (sensor_ptr) { strncpy(sensor_buf, sensor_ptr, sizeof(sensor_buf) - 1); }
     cJSON_Delete(j);
     const char *name = name_ptr ? name_buf : NULL;
     // Server-side validation — the JS UI checks these too, but a curl/HA/MQTT
@@ -1526,6 +1550,16 @@ static esp_err_t handle_post_transmitters(httpd_req_t *req) {
     if (!updated) { if (registry_add(addr, name, min_dist, max_dist, cap) < 0) { send_err(req, "Full"); return ESP_OK; } }
     if (sleep >= 60) {
         registry_set_remote_config(addr, sleep, samples > 0 ? samples : 5, pwr);
+    }
+    // Sensor kind change goes through registry_set_sensor_kind so the next
+    // SET frame to this TX includes :SENSOR=<kind>. Empty / absent string =
+    // leave whatever the TX currently has. Invalid kind is rejected with a
+    // 400-style error message so a typo doesn't silently no-op.
+    if (sensor_buf[0]) {
+        if (!registry_set_sensor_kind(addr, sensor_buf)) {
+            send_err(req, "sensor_kind must be 'sr04' or 'ld2413'");
+            return ESP_OK;
+        }
     }
     // Immediately republish so the cloud DB picks up the change without waiting
     // for the next TANK packet (which can be 10 min away with sleep=600).
@@ -2372,8 +2406,31 @@ static void ws_init(void) {
     }
 }
 
+// ── GET /api/logs?since=N ────────────────────────────────────────────────────
+// Returns plain-text log lines accumulated in the in-RAM ring buffer since
+// the byte cursor N. Same shape as the TX wifi_ota /api/logs endpoint so a
+// caller (curl, dashboard JS, debugging script) can use the same client.
+static esp_err_t handle_get_logs(httpd_req_t *req) {
+    size_t cursor = 0;
+    char qbuf[40];
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
+        char val[20] = {0};
+        if (httpd_query_key_value(qbuf, "since", val, sizeof(val)) == ESP_OK) {
+            cursor = (size_t)strtoul(val, NULL, 10);
+        }
+    }
+    static char out[3000];
+    size_t n = log_buffer_read(out, sizeof(out), &cursor);
+    char hdr[24];
+    snprintf(hdr, sizeof(hdr), "%u", (unsigned)cursor);
+    httpd_resp_set_hdr(req, "X-Log-Cursor", hdr);
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, out, n);
+}
+
 #define URI(m, p, h) { .uri = (p), .method = (m), .handler = (h), .user_ctx = NULL }
 static const httpd_uri_t s_routes[] = {
+    URI(HTTP_GET, "/api/logs", handle_get_logs),
     URI(HTTP_GET, "/", handle_root), URI(HTTP_GET, "/api/data", handle_api_data), URI(HTTP_GET, "/api/system", handle_api_system),
     URI(HTTP_GET, "/api/tanks/history", handle_api_tanks_history),
     // SmartGhar protocol v1 — local LAN API for HA + 3rd-party clients

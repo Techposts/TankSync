@@ -22,7 +22,8 @@ static const char *TAG = "lora_tx";
 #define LINE_BUF 128
 
 static uart_port_t s_uart = UART_NUM_1;
-static char s_fw_version[16] = "";  // set via lora_tx_set_firmware_version
+static char s_fw_version[16]  = "";  // set via lora_tx_set_firmware_version
+static char s_sensor_kind[12] = "";  // set via lora_tx_set_sensor_kind — 11th TANK field
 
 static lora_tx_config_t s_cfg = {
     .freq_hz          = LORA_DEFAULT_FREQ,
@@ -195,14 +196,22 @@ bool lora_tx_send(int dist_cm, int bat_pct, float bat_v,
     // Validate sensor_status tag — fall back to 'u' (unknown).
     if (sensor_status != 'o' && sensor_status != 'e') sensor_status = 'u';
 
-    char payload[128];
+    char payload[160];
+    // 11th positional field: sensor_kind ("sr04" | "ld2413"). Older RX firmwares
+    // simply stop tokenizing at the 10th field, so appending is fully backwards
+    // compatible. Empty string is the legacy "TX didn't report it" sentinel.
     snprintf(payload, sizeof(payload),
-             "TANK:%d:%d:%.2f:%" PRIu32 ":%s:%c:%ld:%ld:%c",
+             "TANK:%d:%d:%.2f:%" PRIu32 ":%s:%c:%ld:%ld:%c:%s",
              dist_cm, bat_pct, bat_v, msg_id,
-             s_fw_version[0] ? s_fw_version : "?",
-             pwr_mode, (long)current_ma, (long)power_mw, sensor_status);
+             s_fw_version[0]  ? s_fw_version  : "?",
+             pwr_mode, (long)current_ma, (long)power_mw, sensor_status,
+             s_sensor_kind[0] ? s_sensor_kind : "?");
 
-    char cmd[176];
+    // cmd buffer sized for the worst-case payload + "AT+SEND=NNNNN,NNN," prefix
+    // (≈ 24 bytes). Bump to 192 from 176 so GCC's format-truncation analysis
+    // doesn't reject the snprintf after the TANK payload grew from 9 to 11
+    // positional fields. Real-world payloads are ~70 chars.
+    char cmd[192];
     int  plen = strlen(payload);
     snprintf(cmd, sizeof(cmd), "AT+SEND=%d,%d,%s",
              s_cfg.receiver_address, plen, payload);
@@ -397,6 +406,15 @@ bool lora_tx_send_raw(const char *payload, int len) {
     snprintf(cmd, sizeof(cmd), "AT+SEND=%d,%d,%.*s",
              s_cfg.receiver_address, len, len, payload);
     return lora_tx_send_at(cmd, 1500);
+}
+
+void lora_tx_set_sensor_kind(const char *kind) {
+    if (kind) {
+        strncpy(s_sensor_kind, kind, sizeof(s_sensor_kind) - 1);
+        s_sensor_kind[sizeof(s_sensor_kind) - 1] = '\0';
+    } else {
+        s_sensor_kind[0] = '\0';
+    }
 }
 
 void lora_tx_set_firmware_version(const char *ver) {

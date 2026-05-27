@@ -270,6 +270,7 @@ static bool parse_rcv(const char *line, lora_rx_packet_t *pkt) {
     pkt->power_mw      = 0;
     pkt->charging      = false;
     pkt->sensor_status = 'u';
+    pkt->sensor_kind[0] = '\0';
 
     char *mode_s = strtok_r(NULL, ":\r\n", &sp2);
     if (mode_s && mode_s[0] != '\0') {
@@ -293,6 +294,15 @@ static bool parse_rcv(const char *line, lora_rx_packet_t *pkt) {
     if (sens_s && sens_s[0] != '\0') {
         char s = sens_s[0];
         if (s == 'o' || s == 'e') pkt->sensor_status = s;
+    }
+
+    // Optional 11th field: sensor_kind tag (since TX v2.0.15) — "sr04" |
+    // "ld2413" | "?" sentinel. Older TX firmware that omits this leaves the
+    // field empty so the dashboard knows "TX too old to report".
+    char *skind_s = strtok_r(NULL, ":\r\n", &sp2);
+    if (skind_s && skind_s[0] != '\0' && skind_s[0] != '?') {
+        strncpy(pkt->sensor_kind, skind_s, sizeof(pkt->sensor_kind) - 1);
+        pkt->sensor_kind[sizeof(pkt->sensor_kind) - 1] = '\0';
     }
 
     pkt->charging = (pkt->power_mode == 'i' && pkt->current_ma < 0);

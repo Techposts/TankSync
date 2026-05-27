@@ -1,6 +1,5 @@
 # TankSync — reliable smart water monitoring
 
-[![Pre-order Developer Edition](https://img.shields.io/badge/Pre--order-Developer%20Edition-success.svg?style=flat)](https://shop.smartghar.org)
 [![Firmware: AGPL-3.0](https://img.shields.io/badge/Firmware-AGPL--3.0-blue.svg)](LICENSE)
 [![Hardware: CC BY-SA 4.0](https://img.shields.io/badge/Hardware-CC%20BY--SA%204.0-orange.svg)](hardware/LICENSE)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.4-red.svg)](https://docs.espressif.com/projects/esp-idf/)
@@ -15,17 +14,6 @@
 </p>
 <p align="center">
   <sub><em>The indoor hub (left), the solar tank sensor with non-contact ultrasonic measurement (centre), and the custom circular TX PCB (right) — current production hardware, REV 2.2 (May 2026), tested through Delhi summer at 45°C ambient.</em></sub>
-</p>
-
-## Watch the story — Episode 1
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=ZZt6cZbWM0g">
-    <img src="https://img.youtube.com/vi/ZZt6cZbWM0g/maxresdefault.jpg" width="70%" alt="TankSync Episode 1 — Smart Home That Works Without Internet" />
-  </a>
-</p>
-<p align="center">
-  <sub><em>Why I built TankSync, the local-first philosophy, and how the rooftop sensor + indoor hub stay reliable when the internet doesn't. <a href="https://www.youtube.com/watch?v=ZZt6cZbWM0g">Watch on YouTube →</a></em></sub>
 </p>
 
 ## Try the in-browser flasher first
@@ -193,26 +181,6 @@ This is the open-source TankSync firmware + hardware mirror. The hosted cloud da
 - Multi-hub fleet management for societies, farms, hotels
 
 The firmware works fully **without** the cloud — local web UI on the hub gives you tank levels, settings, OTA updates, Home Assistant integration. Cloud is opt-in convenience, never a dependency.
-
-## Developer Edition hardware
-
-If you'd rather skip sourcing parts, flashing firmware, printing enclosures, and assembling hardware yourself, prebuilt TankSync Developer Edition kits are available for preorder.
-
-Each kit includes:
-- assembled RX hub
-- assembled TX sensor node
-- flashed firmware
-- LoRa modules preconfigured
-- waterproof enclosure set
-- OLED display + local web UI
-- access to the hosted TankSync PWA experience
-
-The firmware and hardware files remain fully open for self-build deployments.
-
-Preorders:
-https://shop.smartghar.org
-
-First batch is currently planned for end of July / early August 2026.
 
 ## Licenses
 

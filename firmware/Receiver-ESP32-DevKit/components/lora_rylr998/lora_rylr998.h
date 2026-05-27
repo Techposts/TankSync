@@ -58,6 +58,11 @@ typedef struct {
     // but 'e' is an explicit failure signal (paint a sensor-error badge), while
     // 'u' just means "TX is too old to tell us either way."
     char     sensor_status;
+
+    // Sensor driver kind the TX is currently RUNNING (since TX firmware
+    // v2.0.15). Empty string if absent. Compared against the registry's
+    // queued sensor_kind so the dashboard can show Active vs Queued.
+    char     sensor_kind[12];
 } lora_rx_packet_t;
 
 // ── Hardware state ────────────────────────────────────────────────────────────

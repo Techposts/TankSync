@@ -118,6 +118,16 @@ bool lora_tx_enter_pairing(void);
 void lora_tx_set_firmware_version(const char *ver);
 
 /**
+ * Set the sensor-kind string ("sr04" | "ld2413") to include in every TANK
+ * packet as the 11th positional field. Older RX firmwares ignore the
+ * trailing field; RX firmwares >= rx-v2.8.5 (post-2026-05-27) parse it into
+ * tx_data_t.active_sensor and surface it in the dashboard so the user can
+ * see what the TX is actually running versus what was queued for it. Pass
+ * NULL or empty string to suppress (legacy "?" sentinel will be sent).
+ */
+void lora_tx_set_sensor_kind(const char *kind);
+
+/**
  * Put the RYLR998 into low-power sleep (AT+MODE=1). Module current drops
  * from ~25-30 mA (continuous RX) to ~2-3 mA. Module wakes on any UART
  * activity — the first byte may be lost, so wake helpers below send a

@@ -19,4 +19,5 @@ idf_component_register(
         led_ws2812
         geo_time
         buzzer
+        log_buffer
 )

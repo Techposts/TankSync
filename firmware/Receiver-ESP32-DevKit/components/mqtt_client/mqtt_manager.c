@@ -193,6 +193,11 @@ static void handle_cmd(const char *command, const char *payload) {
         cJSON *pwr_j = cJSON_GetObjectItem(j, "lora_pwr");
         uint8_t  pwr = pwr_j ? (uint8_t)cJSON_GetNumberValue(pwr_j) : 0;
         if (pwr > 22) pwr = 22;
+        // Optional sensor_kind ("sr04" | "ld2413"). Absent or empty = leave
+        // whatever the TX currently has. Validation is in registry_set_sensor_kind.
+        const char *sk_ptr = cJSON_GetStringValue(cJSON_GetObjectItem(j, "sensor_kind"));
+        char sk_buf[12] = {0};
+        if (sk_ptr) { strncpy(sk_buf, sk_ptr, sizeof(sk_buf) - 1); }
         cJSON_Delete(j);
 
         const char *name = name_ptr ? name_buf : NULL;
@@ -209,14 +214,21 @@ static void handle_cmd(const char *command, const char *payload) {
         if (sleep_s >= 60) {
             registry_set_remote_config(addr, sleep_s, samples > 0 ? samples : 5, pwr);
         }
+        if (sk_buf[0]) {
+            if (!registry_set_sensor_kind(addr, sk_buf)) {
+                pub(result_topic, "{\"ok\":false,\"err\":\"bad_sensor_kind\"}", 0);
+                return;
+            }
+        }
         // Republish config immediately so cloud sees the new state without waiting
         // for the next periodic publish cycle.
         int idx = registry_find(addr);
         if (idx >= 0) mqtt_publish_tank(idx);
 
         pub(result_topic, "{\"ok\":true}", 0);
-        ESP_LOGI(TAG, "CMD set_config: addr=%u sleep=%lu samples=%u pwr=%u",
-                 (unsigned)addr, (unsigned long)sleep_s, (unsigned)samples, (unsigned)pwr);
+        ESP_LOGI(TAG, "CMD set_config: addr=%u sleep=%lu samples=%u pwr=%u sensor=%s",
+                 (unsigned)addr, (unsigned long)sleep_s, (unsigned)samples, (unsigned)pwr,
+                 sk_buf[0] ? sk_buf : "(unchanged)");
 
     } else if (strcmp(command, "ota_check") == 0) {
         // PWA-triggered manifest check. Non-blocking — actual fetch runs in
@@ -800,6 +812,16 @@ void mqtt_publish_tank(int idx) {
     make_topic(topic, sizeof(topic), slug, "lora_pwr");
     pub(topic, val, 1);
 
+    // sensor_kind — what RX has QUEUED for this TX (the user's choice, what
+    // gets pushed in the next SET frame). Empty = no preference recorded.
+    make_topic(topic, sizeof(topic), slug, "sensor_kind");
+    pub(topic, info.sensor_kind, 1);
+
+    // active_sensor — what the TX is ACTUALLY running, reported in TANK
+    // packets (since TX v2.0.15). Empty if TX firmware doesn't declare it.
+    make_topic(topic, sizeof(topic), slug, "active_sensor");
+    pub(topic, data.active_sensor, 1);
+
     // TX firmware version — published only when TX has actually reported one.
     // Empty/zero means pre-power-telemetry TX or never received the version
     // packet yet; suppress to avoid clobbering a previously-known value.
@@ -821,7 +843,7 @@ void mqtt_unpublish_tank(uint16_t addr) {
         "sensor_error",
         "power_mode", "current_ma", "power_mw", "charging",
         "name", "min_dist", "max_dist", "capacity", "sleep_s", "samples",
-        "lora_pwr", "fw",
+        "lora_pwr", "sensor_kind", "active_sensor", "fw",
     };
     char topic[MAX_TOPIC_LEN];
     for (size_t i = 0; i < sizeof(retained_fields) / sizeof(retained_fields[0]); i++) {

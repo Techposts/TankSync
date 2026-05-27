@@ -173,6 +173,9 @@ static bool save_json(void) {
         cJSON_AddNumberToObject(tx, "sleep",    s_infos[i].sleep_s);
         cJSON_AddNumberToObject(tx, "samples",  s_infos[i].samples);
         cJSON_AddNumberToObject(tx, "lora_pwr", s_infos[i].lora_pwr);
+        if (s_infos[i].sensor_kind[0]) {
+            cJSON_AddStringToObject(tx, "sensor_kind", s_infos[i].sensor_kind);
+        }
         cJSON_AddBoolToObject  (tx, "pending",  s_infos[i].pending_config);
         cJSON_AddBoolToObject  (tx, "ota_p",    s_infos[i].ota_pending);
         cJSON_AddNumberToObject(tx, "ota_o",    s_infos[i].ota_offset);
@@ -281,6 +284,14 @@ static bool load_json(void) {
         info->samples = sa ? (uint8_t)cJSON_GetNumberValue(sa) : 5;
         cJSON *lpw = cJSON_GetObjectItem(tx, "lora_pwr");
         info->lora_pwr = lpw ? (uint8_t)cJSON_GetNumberValue(lpw) : 0;  // 0 = leave at TX default
+        // sensor_kind is optional — legacy registries pre-2.8.6 don't have it; treat as empty (TX keeps current driver)
+        const char *sk = cJSON_GetStringValue(cJSON_GetObjectItem(tx, "sensor_kind"));
+        if (sk && sk[0]) {
+            strncpy(info->sensor_kind, sk, sizeof(info->sensor_kind) - 1);
+            info->sensor_kind[sizeof(info->sensor_kind) - 1] = '\0';
+        } else {
+            info->sensor_kind[0] = '\0';
+        }
         cJSON *pe = cJSON_GetObjectItem(tx, "pending");
         info->pending_config = pe ? cJSON_IsTrue(pe) : false;
         cJSON *op = cJSON_GetObjectItem(tx, "ota_p");
@@ -481,6 +492,7 @@ int registry_add(uint16_t addr, const char *name,
     s_infos[idx].sleep_s         = 300;
     s_infos[idx].samples         = 5;
     s_infos[idx].lora_pwr        = 0;     // 0 = leave at TX default (no override)
+    s_infos[idx].sensor_kind[0]  = '\0';  // empty = leave at TX default (SET frame won't include :SENSOR=)
     s_infos[idx].pending_config  = false;
     s_infos[idx].ota_pending     = false;
     s_infos[idx].ota_offset      = 0;
@@ -605,7 +617,8 @@ bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
                            float bat_v, uint32_t msg_id, int rssi, int snr,
                            const char *fw_version,
                            char power_mode, int32_t current_ma, int32_t power_mw,
-                           char sensor_status) {
+                           char sensor_status,
+                           const char *active_sensor) {
     LOCK();
     int idx = -1;
     for (int i = 0; i < s_count; i++) {
@@ -672,10 +685,45 @@ bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
         strncpy(s_data[idx].fw_version, fw_version, sizeof(s_data[idx].fw_version) - 1);
         s_data[idx].fw_version[sizeof(s_data[idx].fw_version) - 1] = '\0';
     }
+    // active_sensor is RUNTIME state — what the TX is actually running right
+    // now. Refreshed every packet. Old TX firmware that doesn't report it
+    // leaves the field empty so the dashboard can show "TX too old to declare
+    // sensor; default assumed sr04".
+    bool sensor_kind_synced = false;
+    if (active_sensor && active_sensor[0]) {
+        strncpy(s_data[idx].active_sensor, active_sensor,
+                sizeof(s_data[idx].active_sensor) - 1);
+        s_data[idx].active_sensor[sizeof(s_data[idx].active_sensor) - 1] = '\0';
+
+        // ── BIDIRECTIONAL SYNC ───────────────────────────────────────────────
+        // If the TX reports a sensor different from the registry's queued
+        // value AND we have no SET frame in flight (pending_config = false),
+        // the user must have changed it locally via the TX's WiFi-OTA UI.
+        // Learn from it: update the registry's queued sensor_kind so the
+        // PWA / RX dashboard converges on the TX's truth instead of showing
+        // a stale "change pending" forever.
+        //
+        // The pending_config guard matters: while a SET is in flight we may
+        // see one or two TANK packets still reporting the OLD sensor before
+        // the SET delivers + TX reboots. Without the guard we'd clobber the
+        // user's just-clicked-Save intent based on transient packets.
+        if (!s_infos[idx].pending_config &&
+            strcmp(s_infos[idx].sensor_kind, active_sensor) != 0) {
+            ESP_LOGI(TAG, "TX %d locally changed sensor to '%s' (was '%s') — syncing registry",
+                     addr, active_sensor, s_infos[idx].sensor_kind);
+            strncpy(s_infos[idx].sensor_kind, active_sensor,
+                    sizeof(s_infos[idx].sensor_kind) - 1);
+            s_infos[idx].sensor_kind[sizeof(s_infos[idx].sensor_kind) - 1] = '\0';
+            sensor_kind_synced = true;
+        }
+    } else {
+        s_data[idx].active_sensor[0] = '\0';
+    }
 
     calc_water(idx);
-    // Persist when firmware version is first seen or changes (e.g. after OTA)
-    if (ver_changed) save_json();
+    // Persist when firmware version is first seen or changes (e.g. after OTA),
+    // or when we learned a new sensor_kind from TX-side change.
+    if (ver_changed || sensor_kind_synced) save_json();
     UNLOCK();
 
     ESP_LOGI(TAG, "TX[%d] '%s': %d%% (%.0fL) bat=%d%% rssi=%d",
@@ -927,7 +975,38 @@ bool registry_set_remote_config(uint16_t addr, uint32_t sleep_s, uint8_t samples
     return true;
 }
 
-bool registry_get_pending_config(uint16_t addr, uint32_t *sleep_out, uint8_t *samples_out, uint8_t *pwr_out) {
+bool registry_set_sensor_kind(uint16_t addr, const char *kind) {
+    // Validate. NULL or empty = clear the field (SET frame omits :SENSOR=).
+    bool has_kind = (kind && kind[0]);
+    if (has_kind && strcmp(kind, "sr04") != 0 && strcmp(kind, "ld2413") != 0) {
+        ESP_LOGW(TAG, "Rejecting unknown sensor_kind='%s' for addr %d", kind, addr);
+        return false;
+    }
+    LOCK();
+    int idx = -1;
+    for (int i = 0; i < s_count; i++) {
+        if (s_infos[i].address == addr) { idx = i; break; }
+    }
+    if (idx < 0) { UNLOCK(); return false; }
+
+    if (has_kind) {
+        strncpy(s_infos[idx].sensor_kind, kind, sizeof(s_infos[idx].sensor_kind) - 1);
+        s_infos[idx].sensor_kind[sizeof(s_infos[idx].sensor_kind) - 1] = '\0';
+    } else {
+        s_infos[idx].sensor_kind[0] = '\0';
+    }
+    s_infos[idx].pending_config = true;
+    save_json();
+    UNLOCK();
+    ESP_LOGI(TAG, "Sensor kind queued for %d: '%s'", addr,
+             has_kind ? kind : "(cleared)");
+    return true;
+}
+
+bool registry_get_pending_config(uint16_t addr,
+                                 uint32_t *sleep_out, uint8_t *samples_out,
+                                 uint8_t *pwr_out,
+                                 char *sensor_out, size_t sensor_sz) {
     LOCK();
     int idx = -1;
     for (int i = 0; i < s_count; i++) {
@@ -937,6 +1016,10 @@ bool registry_get_pending_config(uint16_t addr, uint32_t *sleep_out, uint8_t *sa
         if (sleep_out)   *sleep_out   = s_infos[idx].sleep_s;
         if (samples_out) *samples_out = s_infos[idx].samples;
         if (pwr_out)     *pwr_out     = s_infos[idx].lora_pwr;
+        if (sensor_out && sensor_sz > 0) {
+            strncpy(sensor_out, s_infos[idx].sensor_kind, sensor_sz - 1);
+            sensor_out[sensor_sz - 1] = '\0';
+        }
         // DO NOT clear here — cleared only on SET_ACK receipt
         // so config retries automatically on next TX wake if delivery fails
         UNLOCK();

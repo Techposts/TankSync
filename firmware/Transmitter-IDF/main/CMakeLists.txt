@@ -4,6 +4,8 @@ idf_component_register(
     REQUIRES
         tanksync_version
         sensor_sr04
+        sensor_iface
+        log_buffer
         battery_monitor
         lora_tx
         wifi_ota

@@ -27,6 +27,7 @@
 #include "display_sh1106.h"
 #include "led_ws2812.h"
 #include "buzzer.h"
+#include "log_buffer.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -214,7 +215,8 @@ static void on_lora_rx(const lora_rx_packet_t *pkt) {
         pkt->msg_id, pkt->rssi, pkt->snr,
         pkt->fw_version,
         pkt->power_mode, pkt->current_ma, pkt->power_mw,
-        pkt->sensor_status);
+        pkt->sensor_status,
+        pkt->sensor_kind);
 
     if (updated) {
         xEventGroupSetBits(s_events, EVT_NEW_LORA_DATA);
@@ -234,14 +236,20 @@ static void on_lora_rx(const lora_rx_packet_t *pkt) {
 
         // CHECK FOR PENDING CONFIG DOWNLINK
         uint32_t sleep_s; uint8_t samples; uint8_t pwr;
-        if (registry_get_pending_config(pkt->src_addr, &sleep_s, &samples, &pwr)) {
-            char cmd[80];
-            // Always send sleep + samples; only append PWR=N if non-zero (0 = "no override")
-            if (pwr > 0) {
-                snprintf(cmd, sizeof(cmd), "SET:SLEEP=%u:SAMP=%u:PWR=%u",
-                         (unsigned)sleep_s, samples, pwr);
-            } else {
-                snprintf(cmd, sizeof(cmd), "SET:SLEEP=%u:SAMP=%u", (unsigned)sleep_s, samples);
+        char sensor_kind[12] = {0};
+        if (registry_get_pending_config(pkt->src_addr, &sleep_s, &samples, &pwr,
+                                        sensor_kind, sizeof(sensor_kind))) {
+            // Build SET frame incrementally. Sleep + samples are always present;
+            // PWR and SENSOR are appended only when non-default so legacy TX
+            // firmwares (pre-2.0.15) safely ignore the trailing tokens.
+            char cmd[96];
+            int  n = snprintf(cmd, sizeof(cmd), "SET:SLEEP=%u:SAMP=%u",
+                              (unsigned)sleep_s, samples);
+            if (pwr > 0 && n < (int)sizeof(cmd)) {
+                n += snprintf(cmd + n, sizeof(cmd) - n, ":PWR=%u", pwr);
+            }
+            if (sensor_kind[0] && n < (int)sizeof(cmd)) {
+                n += snprintf(cmd + n, sizeof(cmd) - n, ":SENSOR=%s", sensor_kind);
             }
             ESP_LOGI(TAG, "Sending downlink config to %d: %s", pkt->src_addr, cmd);
             vTaskDelay(pdMS_TO_TICKS(500)); // Brief delay after ACK
@@ -1183,6 +1191,12 @@ static void history_timer_cb(void *arg) {
 // app_main
 // ─────────────────────────────────────────────────────────────────────────────
 void app_main(void) {
+    // Install the log ring buffer FIRST so even the boot banner is captured
+    // and served via /api/logs to the dashboard / curl users. 4 KB in RAM,
+    // forwards every line through to the original sink (UART console + USB
+    // serial monitor) so existing workflows are untouched.
+    log_buffer_init();
+
     ESP_LOGI(TAG, "TankSync Receiver v%s booting (build %08X)", FIRMWARE_VERSION, (unsigned)TS_BUILD_FP);
 
     // ── 1. NVS ──

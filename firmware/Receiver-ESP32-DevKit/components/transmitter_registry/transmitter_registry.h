@@ -36,6 +36,7 @@ typedef struct {
     uint32_t sleep_s;               // Sleep interval in seconds
     uint8_t  samples;               // Number of sensor samples
     uint8_t  lora_pwr;              // LoRa TX power 0-22 dBm (0 = use TX default; pairing-set values otherwise)
+    char     sensor_kind[12];       // "sr04" | "ld2413" — sensor driver the TX should load. Empty/unknown = leave TX at its current value.
     bool     pending_config;        // true if config needs to be sent
     // LoRa OTA fields
     bool     ota_pending;           // true if firmware update queued
@@ -91,6 +92,13 @@ typedef struct {
     // a 20-sample ring buffer of recent raw_dist readings; if spread (max-min)
     // ≤ 2 cm over a full window, the sensor is stuck and flagged.
     bool      sensor_stuck;
+
+    // Sensor driver kind the TX last reported (since TX firmware v2.0.15).
+    // RUNTIME ONLY — not persisted across reboots; comes fresh in every TANK
+    // packet so the dashboard always shows "what the TX is actually running"
+    // versus the registry's queued sensor_kind ("what the user requested").
+    // Empty = old TX firmware that doesn't report it.
+    char      active_sensor[12];
 } tx_data_t;
 
 // ── Registry init ─────────────────────────────────────────────────────────────
@@ -110,9 +118,18 @@ bool registry_set_led_color(uint16_t addr, int8_t color_idx);
  *  pwr=0 means "don't change LoRa power"; 1-22 dBm sets it explicitly. */
 bool registry_set_remote_config(uint16_t addr, uint32_t sleep_s, uint8_t samples, uint8_t pwr);
 
-/** Check if pending config exists, fills output if yes. Does NOT clear flag.
- *  pwr_out is 0 if no pwr change requested. */
-bool registry_get_pending_config(uint16_t addr, uint32_t *sleep_out, uint8_t *samples_out, uint8_t *pwr_out);
+/** Set the TX's sensor driver kind ("sr04" or "ld2413"). NULL or empty clears
+ *  the field. Always marks pending_config true so the next SET frame to this
+ *  TX includes :SENSOR=<kind>. Returns false if addr unknown or kind invalid. */
+bool registry_set_sensor_kind(uint16_t addr, const char *kind);
+
+/** Check if pending config exists, fills outputs if yes. Does NOT clear flag.
+ *  pwr_out is 0 if no pwr change requested. sensor_out is filled with the
+ *  configured kind (empty string if never set) — pass NULL + 0 to skip. */
+bool registry_get_pending_config(uint16_t addr,
+                                 uint32_t *sleep_out, uint8_t *samples_out,
+                                 uint8_t *pwr_out,
+                                 char *sensor_out, size_t sensor_sz);
 
 /** Clear pending config flag after SET_ACK is received from transmitter. */
 bool registry_clear_pending_config(uint16_t addr);
@@ -142,7 +159,8 @@ bool registry_update_data(uint16_t addr, int raw_dist, int bat_pct,
                            float bat_v, uint32_t msg_id, int rssi, int snr,
                            const char *fw_version,
                            char power_mode, int32_t current_ma, int32_t power_mw,
-                           char sensor_status);
+                           char sensor_status,
+                           const char *active_sensor);
 
 // ── History (Phase 2) ────────────────────────────────────────────────────────
 /** Capture current readings into the half-hourly history buffer for any tank
